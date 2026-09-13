@@ -25,8 +25,8 @@ tar --exclude='TokenBar.app' --exclude='dist' --exclude='.probe' \
     -czf "$OUT/TokenBar-$VERSION-fonte.tar.gz" \
     Sources tools Resources build.sh install.sh uninstall.sh dist.sh README.md config.example.json
 
-cat > "$OUT/LEIA-ME.txt" <<'TXT'
-TokenBar — consumo de tokens do Claude Code e do Codex na barra de menus
+cat > "$OUT/LEIA-ME.txt" <<TXT
+TokenBar $VERSION — consumo de tokens do Claude Code e do Codex na barra de menus
 =======================================================================
 
 Requisitos: macOS 14 ou superior, Mac com Apple Silicon (M1 em diante).
@@ -36,7 +36,7 @@ Não faz nenhuma conexão de rede e não acessa credenciais.
 --------------------------------------------------------------------------
 OPÇÃO A — usar o app já compilado (mais rápido)
 --------------------------------------------------------------------------
-1. Descompacte TokenBar-1.0-AppleSilicon.zip
+1. Descompacte TokenBar-$VERSION-AppleSilicon.zip
 2. Arraste TokenBar.app para a pasta Aplicativos
 3. O macOS vai recusar a abertura na primeira vez, porque o app não é
    assinado por uma conta paga de desenvolvedor da Apple. Para liberar,
@@ -57,7 +57,7 @@ OPÇÃO B — compilar na própria máquina (sem bloqueio do Gatekeeper)
 
        xcode-select --install
 
-2. Descompacte TokenBar-1.0-fonte.tar.gz e rode:
+2. Descompacte TokenBar-$VERSION-fonte.tar.gz e rode:
 
        ./install.sh
 

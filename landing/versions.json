@@ -1,6 +1,14 @@
 {
-  "atual": "1.2.1",
+  "atual": "1.2.2",
   "versoes": [
+    {
+      "versao": "1.2.2",
+      "data": "2026-09-12",
+      "arquivo": "download/TokenBar-1.2.2-AppleSilicon.zip",
+      "tamanhoKB": 1148,
+      "sha256": "cd38b515eca44055b5daf77f9776b3575b76677f675009879e599306659a35f3",
+      "notas": []
+    },
     {
       "versao": "1.2.1",
       "data": "2026-09-12",

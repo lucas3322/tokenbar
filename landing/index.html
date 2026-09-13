@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TokenBar — quanto você já gastou do Claude e do Codex, na barra do Mac</title>
+<meta name="description" content="App de barra de menus do macOS que mostra o consumo de tokens, os limites de sessão e o custo do Claude Code e do Codex. Gratuito, sem conta e sem rede.">
+
+<meta property="og:title" content="TokenBar">
+<meta property="og:description" content="Quanto você já gastou do Claude e do Codex, sem sair do que está fazendo.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0B0D10">
+
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   TOKENBAR — página de apresentação
+
+   Direção: painel de instrumentos. O produto é um mostrador; a página
+   se comporta como um. Anéis, marcações de escala, algarismos em mono
+   alinhados, nada de ilustração decorativa. Duas cores de leitura —
+   verde para o Claude, azul para o Codex —, o resto é metal e vidro.
+
+   O centro da página é o próprio painel, redesenhado em HTML. Não é
+   captura de tela: é o instrumento em tamanho real.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --void:     #08090B;
+  --ink:      #0B0D10;
+  --ink-2:    #101317;
+  --ink-3:    #161A20;
+  --steel:    #1D222A;
+
+  --claude:   #4ECD8C;
+  --claude-lo:#2DA76B;
+  --codex:    #6E9BFF;
+  --codex-lo: #4A72D8;
+  --warn:     #F5B93C;
+
+  --text:     #E9ECF1;
+  --dim:      #99A2AE;
+  --faint:    #5E6773;
+
+  --rule:     rgba(255,255,255,.075);
+  --rule-2:   rgba(255,255,255,.04);
+
+  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+
+  --gutter: clamp(20px, 5vw, 80px);
+  --measure: 1180px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* Malha de escala ao fundo, como a gravação de um mostrador. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--rule-2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-2) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+a { color: inherit; }
+img, svg { max-width: 100%; }
+
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter); position: relative; z-index: 1; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 14px;
+}
+
+h1, h2, h3 { line-height: 1.15; letter-spacing: -.022em; margin: 0; }
+h1 { font-size: clamp(38px, 6.2vw, 68px); font-weight: 600; }
+h2 { font-size: clamp(26px, 3.4vw, 38px); font-weight: 600; }
+h3 { font-size: 17px; font-weight: 600; letter-spacing: -.012em; }
+
+p { margin: 0; }
+.lede { font-size: clamp(17px, 2vw, 20px); color: var(--dim); max-width: 62ch; }
+
+/* ── Cabeçalho ─────────────────────────────────────────────────── */
+header {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: saturate(160%) blur(14px);
+  background: color-mix(in oklab, var(--ink) 82%, transparent);
+  border-bottom: 1px solid var(--rule);
+}
+.bar { display: flex; align-items: center; gap: 14px; height: 62px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -.02em; }
+.brand img { width: 26px; height: 26px; }
+.nav { margin-left: auto; display: flex; gap: 26px; font-size: 14px; color: var(--dim); }
+.nav a { text-decoration: none; transition: color .15s; }
+.nav a:hover { color: var(--text); }
+@media (max-width: 720px) { .nav { display: none; } }
+
+/* ── Botões ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 22px;
+  border-radius: 10px;
+  font-size: 15px; font-weight: 500;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform .12s ease, background .15s, border-color .15s;
+}
+.btn:active { transform: translateY(1px); }
+.btn-main { background: var(--text); color: var(--ink); }
+.btn-main:hover { background: #fff; }
+.btn-ghost { border-color: var(--rule); color: var(--dim); }
+.btn-ghost:hover { border-color: rgba(255,255,255,.2); color: var(--text); }
+.btn small { font-family: var(--mono); font-size: 11.5px; opacity: .6; font-weight: 400; }
+
+/* ── Herói ─────────────────────────────────────────────────────── */
+.hero { padding: clamp(56px, 9vw, 104px) 0 clamp(40px, 6vw, 72px); }
+.hero h1 span { color: var(--faint); }
+.hero .lede { margin-top: 22px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 32px; }
+.cta-note { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+
+/* Recorte da barra de menus do macOS. */
+.menubar {
+  margin-top: 44px;
+  border: 1px solid var(--rule);
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, #101318, #0C0E12);
+  padding: 0 16px;
+  height: 34px;
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 20px;
+  font-family: var(--mono); font-size: 12.5px;
+  color: var(--faint);
+  overflow: hidden;
+}
+.menubar .reading { color: var(--text); }
+.menubar .reading b { font-weight: 500; }
+.menubar .tag { color: var(--faint); margin-right: 5px; font-size: 11px; }
+.menubar .rest { display: flex; gap: 14px; align-items: center; opacity: .4; }
+
+/* ── O painel, redesenhado ─────────────────────────────────────── */
+.panelwrap { display: flex; justify-content: flex-end; padding: 0 16px; }
+.panel {
+  width: min(430px, 100%);
+  background: linear-gradient(180deg, #14171D, #0F1216);
+  border: 1px solid var(--rule);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 30px 70px -30px rgba(0,0,0,.9);
+  padding: 14px 15px 12px;
+  animation: descend .5s cubic-bezier(.2,.8,.25,1) both;
+}
+@keyframes descend { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+
+.panel-top { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+.panel-top img { width: 17px; height: 17px; }
+.panel-top time { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); font-weight: 400; }
+
+.dials { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.dial { text-align: center; }
+.dial svg { width: 52px; height: 52px; display: block; margin: 0 auto 6px; }
+.dial .pct { font-family: var(--mono); font-size: 13.5px; font-weight: 600; fill: var(--text); }
+.dial .who { font-size: 10.5px; font-weight: 500; }
+.dial .win { font-size: 9.5px; color: var(--dim); }
+.dial .rst { font-family: var(--mono); font-size: 8.5px; color: var(--faint); }
+
+.tabs {
+  display: flex; gap: 2px; margin: 14px 0 12px;
+  background: rgba(255,255,255,.045); border-radius: 8px; padding: 2px;
+}
+.tabs span {
+  flex: 1; text-align: center; font-size: 11.5px; padding: 5px 0;
+  border-radius: 6px; color: var(--dim);
+}
+.tabs span.on { background: rgba(255,255,255,.13); color: var(--text); font-weight: 500; }
+
+.card { background: rgba(255,255,255,.045); border-radius: 9px; padding: 11px; margin-bottom: 9px; }
+.card-head { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.card-head .dot { width: 6px; height: 6px; border-radius: 50%; }
+.card-head .cost { margin-left: auto; font-family: var(--mono); font-size: 11.5px; font-weight: 500; }
+.card-head .plan {
+  font-size: 8.5px; font-weight: 500; letter-spacing: .04em;
+  background: rgba(255,255,255,.12); border-radius: 20px; padding: 2px 6px; color: var(--dim);
+}
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); }
+.metrics div span { display: block; font-size: 9px; color: var(--faint); }
+.metrics div b { font-size: 12.5px; font-weight: 500; }
+.live { display: flex; align-items: center; gap: 5px; font-size: 10px; margin-top: 7px; color: var(--dim); }
+.live b { color: var(--text); font-weight: 500; }
+.live .ctx { margin-left: auto; font-family: var(--mono); }
+
+/* ── Seções ────────────────────────────────────────────────────── */
+.section { padding: clamp(58px, 8vw, 100px) 0; border-top: 1px solid var(--rule); }
+.section-head { max-width: 66ch; margin-bottom: 42px; }
+.section-head p { margin-top: 16px; }
+
+.grid { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+.grid.three { grid-template-columns: repeat(3, 1fr); }
+.grid.two { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 860px) { .grid.three, .grid.two { grid-template-columns: 1fr; } }
+.cell { background: var(--ink-2); padding: 26px 24px; }
+.cell .num { font-family: var(--mono); font-size: 11px; color: var(--faint); display: block; margin-bottom: 12px; }
+.cell h3 { margin-bottom: 9px; }
+.cell p { color: var(--dim); font-size: 14.5px; }
+
+/* Tabela de honestidade. */
+.truth { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.truth th, .truth td { text-align: left; padding: 15px 16px; border-bottom: 1px solid var(--rule); }
+.truth th { font-size: 11px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+.truth td:first-child { color: var(--dim); }
+.truth .yes { color: var(--claude); font-weight: 500; }
+.truth .est { color: var(--warn); font-weight: 500; }
+.truth tr:last-child td { border-bottom: none; }
+.tablebox { border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--ink-2); }
+
+/* Passos de instalação. */
+.steps { counter-reset: s; display: grid; gap: 18px; }
+.step { display: grid; grid-template-columns: 30px 1fr; gap: 16px; align-items: start; }
+.step::before {
+  counter-increment: s; content: counter(s);
+  font-family: var(--mono); font-size: 12px; color: var(--faint);
+  border: 1px solid var(--rule); border-radius: 50%;
+  width: 30px; height: 30px; display: grid; place-items: center;
+}
+.step p { color: var(--dim); font-size: 14.5px; margin-top: 4px; }
+code, .code {
+  font-family: var(--mono); font-size: 13px;
+  background: var(--void); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 2px 7px; color: var(--text);
+}
+.code { display: block; padding: 13px 15px; margin-top: 10px; overflow-x: auto; white-space: pre; }
+
+/* Novidades. */
+.releases { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+.release { background: var(--ink-2); padding: 24px; display: grid; grid-template-columns: 150px 1fr; gap: 24px; }
+@media (max-width: 720px) { .release { grid-template-columns: 1fr; gap: 10px; } }
+.release .meta .v { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+.release .meta .d { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+.release .meta .now {
+  display: inline-block; margin-top: 7px; font-size: 10px; font-family: var(--mono);
+  color: var(--claude); border: 1px solid color-mix(in oklab, var(--claude) 35%, transparent);
+  border-radius: 20px; padding: 1px 8px;
+}
+.release h3 { margin-bottom: 10px; }
+.release ul { margin: 0; padding-left: 17px; color: var(--dim); font-size: 14.5px; }
+.release li { margin-bottom: 6px; }
+.release .dl { margin-top: 12px; font-size: 13px; }
+.release .dl a { color: var(--text); }
+.release .sha { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 6px; word-break: break-all; }
+
+footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--faint); font-size: 13.5px; }
+.footrow { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <span class="brand"><img src="icon.svg" alt=""> TokenBar</span>
+    <nav class="nav">
+      <a href="#painel">O painel</a>
+      <a href="#numeros">Os números</a>
+      <a href="#instalar">Instalar</a>
+      <a href="#novidades">Novidades</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">macOS · Apple Silicon · gratuito</p>
+    <h1>Quanto você já gastou<br><span>do Claude e do Codex.</span></h1>
+    <p class="lede">
+      Um mostrador na barra de menus com o consumo das duas ferramentas: o quanto resta
+      da janela de 5 horas, o total da semana, o custo do dia e a sessão que está rodando
+      agora. Sem abrir nada, sem sair do que você está fazendo.
+    </p>
+    <div class="cta">
+      <a class="btn btn-main" id="baixar" href="#instalar" download>
+        Baixar para Mac <small id="verlabel"></small>
+      </a>
+      <a class="btn btn-ghost" href="#numeros">Como os números são obtidos</a>
+    </div>
+    <p class="cta-note" id="filenote"></p>
+
+    <!-- A barra de menus e o painel: o produto, não uma captura dele. -->
+    <div class="menubar">
+      <span class="reading"><span class="tag">CC</span><b>42%</b></span>
+      <span class="reading"><span class="tag">CX</span><b>4%</b></span>
+      <span class="rest" aria-hidden="true">
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.3">
+          <path d="M1 3.6a9 9 0 0 1 13 0M3.5 6.2a5.5 5.5 0 0 1 8 0"/><circle cx="7.5" cy="9" r=".9" fill="currentColor" stroke="none"/>
+        </svg>
+        <svg width="18" height="11" viewBox="0 0 18 11" fill="none" stroke="currentColor" stroke-width="1.1">
+          <rect x=".6" y="1.6" width="14" height="7.8" rx="2.2"/><path d="M16 4.4v3.2" stroke-linecap="round"/>
+          <rect x="2.2" y="3.2" width="6" height="4.6" rx="1" fill="currentColor" stroke="none"/>
+        </svg>
+        <span>22:51</span>
+      </span>
+    </div>
+    <div class="panelwrap">
+      <div class="panel">
+        <div class="panel-top"><img src="icon.svg" alt=""> TokenBar <time>22:51</time></div>
+
+        <div class="dials">
+          <div class="dial" data-dial data-pct="42" data-color="claude">
+            <div class="who">Claude</div><div class="win">sessão 5h</div><div class="rst">reseta 00:45</div>
+          </div>
+          <div class="dial" data-dial data-pct="16" data-color="claude">
+            <div class="who">Claude</div><div class="win">semanal</div><div class="rst">reseta qui 12:00</div>
+          </div>
+          <div class="dial" data-dial data-pct="4" data-color="codex">
+            <div class="who">Codex</div><div class="win">sessão 5h</div><div class="rst">reseta 00:35</div>
+          </div>
+          <div class="dial" data-dial data-pct="16" data-color="codex">
+            <div class="who">Codex</div><div class="win">semanal</div><div class="rst">reseta sab 14:30</div>
+          </div>
+        </div>
+
+        <div class="tabs"><span class="on">Visão geral</span><span>Claude</span><span>Codex</span><span>Ajustes</span></div>
+
+        <div class="card">
+          <div class="card-head">
+            <i class="dot" style="background:var(--claude)"></i> Claude Code
+            <span class="cost">$24.90</span>
+          </div>
+          <div class="metrics">
+            <div><span>hoje</span><b>31.1M</b></div>
+            <div><span>ciclo</span><b>142.5M</b></div>
+            <div><span>cache</span><b>98%</b></div>
+          </div>
+          <div class="live">⚡ <b>tokenbar</b> · opus-5 <span class="ctx">ctx 31%</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <i class="dot" style="background:var(--codex)"></i> Codex
+            <span class="plan">PLUS</span>
+            <span class="cost">$22.59</span>
+          </div>
+          <div class="metrics">
+            <div><span>hoje</span><b>29.6M</b></div>
+            <div><span>7 dias</span><b>258.1M</b></div>
+            <div><span>cache</span><b>96%</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="painel">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">O painel</p>
+      <h2>Passa o mouse, ele desce.</h2>
+      <p class="lede">Nada de abrir aplicativo, nada de rodar comando. O painel aparece onde o
+        ponteiro já está e some quando você sai.</p>
+    </div>
+    <div class="grid three">
+      <div class="cell">
+        <span class="num">01</span>
+        <h3>Quanto falta da sessão</h3>
+        <p>Os quatro anéis mostram as janelas de 5 horas e as semanais das duas ferramentas,
+          com o horário exato em que cada uma reseta. O número na barra fica laranja aos 60%
+          e vermelho aos 85%, então você percebe antes de bater.</p>
+      </div>
+      <div class="cell">
+        <span class="num">02</span>
+        <h3>Para onde foram os tokens</h3>
+        <p>Consumo do dia e do ciclo separado por entrada, saída, cache lido e cache escrito,
+          além do custo por modelo. É onde se descobre que 30 milhões de tokens custaram
+          poucos dólares porque 97% vieram do cache.</p>
+      </div>
+      <div class="cell">
+        <span class="num">03</span>
+        <h3>A sessão que está rodando</h3>
+        <p>Qual projeto, qual modelo e quanto da janela de contexto já foi preenchido —
+          útil para saber se está perto de precisar compactar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="numeros">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Os números</p>
+      <h2>Metade é exata. A outra metade avisa que não é.</h2>
+      <p class="lede">
+        O Codex grava o percentual real do limite nos próprios registros, vindo do servidor —
+        o TokenBar só lê. O Claude Code não grava: o limite só aparece depois que a API já
+        recusou uma requisição. Por isso o percentual do Claude é calculado, e vem marcado
+        com ✨ na interface.
+      </p>
+    </div>
+
+    <div class="tablebox">
+      <table class="truth">
+        <tr><th></th><th>Codex</th><th>Claude Code</th></tr>
+        <tr><td>Limite de 5 horas</td><td class="yes">exato</td><td class="est">calculado ✨</td></tr>
+        <tr><td>Limite semanal</td><td class="yes">exato</td><td class="est">calculado ✨</td></tr>
+        <tr><td>Tokens e custo</td><td class="yes">exato</td><td class="yes">exato</td></tr>
+        <tr><td>Precisa configurar</td><td>não</td><td>calibrar uma vez, dentro do app</td></tr>
+      </table>
+    </div>
+
+    <div class="grid two" style="margin-top:26px">
+      <div class="cell">
+        <h3>Calibrar leva cinco segundos</h3>
+        <p>Você abre o painel de uso do app da Anthropic, digita o percentual que ele mostra
+          na aba Ajustes e pronto — o TokenBar calcula o teto sozinho. Vale repetir de vez em
+          quando: o limite muda com bônus temporários e com mudança de plano.</p>
+      </div>
+      <div class="cell">
+        <h3>Nada sai da sua máquina</h3>
+        <p>O app lê os registros que as duas ferramentas já gravam no seu disco. Não faz
+          conexão de rede, não acessa credenciais e não envia nada para lugar nenhum. Não há
+          conta para criar nem telemetria para desligar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="instalar">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Instalar</p>
+      <h2>Três passos, uma vez só.</h2>
+      <p class="lede">Requer macOS 14 ou superior e um Mac com Apple Silicon (M1 em diante).
+        Só mostra dados de quem usa Claude Code ou Codex na própria máquina.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h3>Baixe e descompacte</h3>
+          <p>Arraste o <code>TokenBar.app</code> para a pasta Aplicativos.</p>
+          <a class="btn btn-main" id="baixar2" href="#" download style="margin-top:14px">
+            Baixar para Mac <small id="verlabel2"></small>
+          </a>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Libere a primeira abertura</h3>
+          <p>O app é assinado localmente, sem conta paga de desenvolvedor da Apple, então o
+            macOS bloqueia na primeira vez. Isso destrava de uma vez por todas:</p>
+          <code class="code">xattr -dr com.apple.quarantine /Applications/TokenBar.app</code>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Calibre o Claude</h3>
+          <p>Abra o painel, vá em <strong>Ajustes › Calibrar o Claude</strong> e informe o
+            percentual que o app da Anthropic mostra em Configurações › Uso. O Codex já vem
+            certo e não precisa de nada.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="novidades">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Novidades</p>
+      <h2>O que mudou em cada versão.</h2>
+    </div>
+    <div class="releases" id="releases"></div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap footrow">
+    <span>TokenBar · gratuito · feito para uso próprio e compartilhado sem custo</span>
+    <span id="rodape"></span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ── Anéis do painel ───────────────────────────────────────────
+     Desenhados por script para o traçado animar do zero até o valor. */
+  const R = 22, C = 2 * Math.PI * R;
+  document.querySelectorAll('[data-dial]').forEach((el, i) => {
+    const pct = Number(el.dataset.pct);
+    const cor = el.dataset.color === 'codex' ? 'var(--codex)' : 'var(--claude)';
+    const svg = `
+      <svg viewBox="0 0 52 52" aria-label="${pct}% usado">
+        <circle cx="26" cy="26" r="${R}" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="4"/>
+        <circle cx="26" cy="26" r="${R}" fill="none" stroke="${cor}" stroke-width="4"
+                stroke-linecap="round" transform="rotate(-90 26 26)"
+                stroke-dasharray="${C}" stroke-dashoffset="${C}"
+                style="transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.25,1) ${i * 0.09 + 0.2}s"/>
+        <text class="pct" x="26" y="30.5" text-anchor="middle">${pct}%</text>
+      </svg>`;
+    el.insertAdjacentHTML('afterbegin', svg);
+    requestAnimationFrame(() => {
+      el.querySelector('circle:last-of-type').style.strokeDashoffset = C * (1 - pct / 100);
+    });
+  });
+
+  /* ── Versões e download ───────────────────────────────────────
+     A lista vem de versions.json, gerado por landing/sync.sh — assim
+     publicar uma versão nova não exige editar esta página. */
+  const fmtData = (iso) => {
+    const [a, m, d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+  };
+
+  fetch('versions.json', { cache: 'no-cache' })
+    .then((r) => r.json())
+    .then((dados) => {
+      const atual = dados.versoes.find((v) => v.versao === dados.atual) || dados.versoes[0];
+
+      if (atual && atual.arquivo) {
+        for (const id of ['baixar', 'baixar2']) {
+          const a = document.getElementById(id);
+          if (a) a.href = atual.arquivo;
+        }
+        const mb = (atual.tamanhoKB / 1024).toFixed(1).replace('.', ',');
+        document.getElementById('verlabel').textContent = `${atual.versao}`;
+        document.getElementById('verlabel2').textContent = `${atual.versao}`;
+        document.getElementById('filenote').textContent =
+          `versão ${atual.versao} · ${mb} MB · Apple Silicon · macOS 14+`;
+        document.getElementById('rodape').textContent = `versão atual ${atual.versao}`;
+      }
+
+      document.getElementById('releases').innerHTML = dados.versoes.map((v) => `
+        <article class="release">
+          <div class="meta">
+            <div class="v">${v.versao}</div>
+            <div class="d">${fmtData(v.data)}</div>
+            ${v.versao === dados.atual ? '<span class="now">atual</span>' : ''}
+          </div>
+          <div>
+            ${v.titulo ? `<h3>${v.titulo}</h3>` : ''}
+            <ul>${(v.notas || []).map((n) => `<li>${n}</li>`).join('')}</ul>
+            ${v.arquivo ? `<p class="dl"><a href="${v.arquivo}" download>Baixar esta versão</a>
+              <span class="sha">sha256 ${v.sha256}</span></p>` : ''}
+          </div>
+        </article>`).join('');
+    })
+    .catch(() => {
+      document.getElementById('releases').innerHTML =
+        '<article class="release"><div></div><div><p style="color:var(--dim)">Não foi possível carregar a lista de versões.</p></div></article>';
+    });
+})();
+</script>
+</body>
+</html>

@@ -254,6 +254,12 @@ git push origin main --follow-tags
 O workflow recusa a publicação se a tag não bater com o arquivo `VERSION`, para não sair
 uma Release `v1.3.0` contendo um app que se identifica como `1.2.1`.
 
+## Landing page
+
+`landing/` tem a página de download, servida pelo Caddy e publicada no Railway. Ela
+hospeda o instalador por conta própria, então funciona com o repositório privado. O
+changelog sai de `landing/versions.json`. Detalhes em [landing/README.md](landing/README.md).
+
 ## Estrutura do projeto
 
 ```

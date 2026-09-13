@@ -1,0 +1,47 @@
+{
+  "atual": "1.2.1",
+  "versoes": [
+    {
+      "versao": "1.2.1",
+      "data": "2026-09-12",
+      "arquivo": "download/TokenBar-1.2.1-AppleSilicon.zip",
+      "tamanhoKB": 1148,
+      "sha256": "48d9bf66945cf5c5e7a56cdf2979cc2393687680f82aad7d6d0c52aadb5ed45e",
+      "notas": [
+        "As abas agora ocupam a largura inteira do painel, sem o vão à direita.",
+        "O aviso de estimativa passou a dizer de onde veio o teto em uso, em vez de afirmar sempre que era do maior bloco histórico."
+      ],
+      "titulo": "Ajustes de interface"
+    },
+    {
+      "versao": "1.2.0",
+      "data": "2026-09-12",
+      "titulo": "Limite semanal do Claude nos anéis",
+      "notas": [
+        "Quarto anel: o limite semanal do Claude, que antes só existia na aba de detalhe.",
+        "Resets distantes mostram o dia da semana em vez de um horário solto."
+      ]
+    },
+    {
+      "versao": "1.1.0",
+      "data": "2026-09-12",
+      "titulo": "Ajustes, calibração e ícone",
+      "notas": [
+        "Aba Ajustes: ligar o início automático, abrir a configuração, sair e desinstalar sem tocar no terminal.",
+        "Calibração do Claude dentro do app: você digita o percentual que o app da Anthropic mostra e o teto é calculado sozinho.",
+        "Ícone próprio, nos dez tamanhos que o macOS pede.",
+        "Instalação em /Applications com ./install.sh --system."
+      ]
+    },
+    {
+      "versao": "1.0.0",
+      "data": "2026-09-12",
+      "titulo": "Primeira versão",
+      "notas": [
+        "Consumo do Claude Code e do Codex na barra de menus, com painel que desce ao passar o mouse.",
+        "Limites exatos do Codex, lidos dos próprios logs dele.",
+        "Leitura incremental: a primeira varredura leva cerca de 45 segundos, as seguintes 0,2."
+      ]
+    }
+  ]
+}

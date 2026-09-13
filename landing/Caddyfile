@@ -1,0 +1,33 @@
+# Servidor da landing no Railway.
+#
+# O Railway injeta a porta em PORT — escutar em outra deixa o deploy "sem
+# resposta" e reprova o healthcheck. O :8080 é só o padrão local.
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+	file_server
+
+	# O HTML e a lista de versões mudam a cada deploy; o binário é imutável,
+	# porque o nome do arquivo carrega a versão.
+	@html path *.html /
+	header @html Cache-Control "public, max-age=0, must-revalidate"
+	header /versions.json Cache-Control "public, max-age=60"
+	header /icon.svg Cache-Control "public, max-age=86400"
+	header /download/* Cache-Control "public, max-age=31536000, immutable"
+
+	# Força o download em vez de o navegador tentar abrir o arquivo.
+	@zip path /download/*.zip
+	header @zip Content-Disposition "attachment"
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

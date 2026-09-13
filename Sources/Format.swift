@@ -51,6 +51,16 @@ enum Fmt {
     }
 }
 
+/// Cores de identidade, as mesmas da landing: verde para o Claude, azul para o Codex.
+enum Tint {
+    static let claude = Color(red: 0.31, green: 0.80, blue: 0.55)
+    static let codex  = Color(red: 0.43, green: 0.61, blue: 1.00)
+
+    static func of(_ provider: String) -> Color {
+        provider.hasPrefix("Codex") ? codex : claude
+    }
+}
+
 extension Severity {
     var color: Color {
         switch self {

@@ -164,6 +164,7 @@ final class SettingsStore: ObservableObject {
 struct SettingsTab: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var monitor: UsageMonitor
+    @ObservedObject var updater: Updater
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -181,6 +182,10 @@ struct SettingsTab: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
+            }
+
+            Panel(title: "ATUALIZAÇÕES") {
+                UpdateBox(updater: updater)
             }
 
             Panel(title: "CALIBRAR O CLAUDE") {
@@ -221,6 +226,81 @@ struct SettingsTab: View {
             }
         }
         .onAppear { store.refresh() }
+    }
+}
+
+/// Estado e ações de atualização.
+struct UpdateBox: View {
+    @ObservedObject var updater: Updater
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                icone
+                Text(mensagem)
+                    .font(.system(size: 11.5))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                botao
+            }
+
+            Toggle(isOn: $updater.verificarAutomaticamente) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Verificar automaticamente").font(.system(size: 11))
+                    Text("única conexão de rede do app: consulta as versões publicadas, sem enviar nada")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder private var icone: some View {
+        switch updater.estado {
+        case .verificando, .baixando, .instalando:
+            ProgressView().controlSize(.small).scaleEffect(0.6).frame(width: 15)
+        case .disponivel:
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 12)).foregroundStyle(Tint.codex).frame(width: 15)
+        case .erro:
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 11)).foregroundStyle(Severity.warn.color).frame(width: 15)
+        default:
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 15)
+        }
+    }
+
+    private var mensagem: String {
+        switch updater.estado {
+        case .parado: return "Versão \(updater.versaoAtual)"
+        case .verificando: return "Procurando versão nova…"
+        case .atualizado(let v): return "Você está na versão mais recente (\(v))"
+        case .disponivel(let v, _, let tamanho):
+            let mb = Double(tamanho) / 1_048_576
+            return tamanho > 0
+                ? String(format: "Versão %@ disponível · %.1f MB", v, mb)
+                : "Versão \(v) disponível"
+        case .baixando: return "Baixando…"
+        case .instalando: return "Instalando — o app vai reabrir sozinho"
+        case .erro(let texto): return texto
+        }
+    }
+
+    @ViewBuilder private var botao: some View {
+        switch updater.estado {
+        case .disponivel:
+            Button("Instalar") { Task { await updater.baixarEInstalar() } }
+                .font(.system(size: 10.5)).controlSize(.small)
+        case .verificando, .baixando, .instalando:
+            EmptyView()
+        default:
+            Button("Verificar") { Task { await updater.verificar() } }
+                .font(.system(size: 10.5)).controlSize(.small)
+        }
     }
 }
 

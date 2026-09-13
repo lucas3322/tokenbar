@@ -10,6 +10,11 @@
   "claudeWeeklyResetWeekday": 5,
   "claudeWeeklyResetHour": 12,
 
+  "_leia_update": "O app verifica versões novas na API pública de releases do repositório abaixo. Só funciona com o repositório público. Deixe autoCheckUpdates em false para o app nunca acessar a rede.",
+  "updateRepo": "lucas3322/tokenbar",
+  "autoCheckUpdates": true,
+  "updateCheckHours": 6,
+
   "_leia_precos": "Preços OpenAI por milhão de tokens, usados só para o custo estimado. Atualize quando a OpenAI mudar a tabela. Os preços da Anthropic são fixos no binário.",
   "openaiPrices": {
     "gpt-5.6-sol":   { "input": 5.00, "output": 30.00, "cachedInput": 0.50 },

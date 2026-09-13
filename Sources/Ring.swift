@@ -58,14 +58,14 @@ struct RingRow: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            ring(snapshot.claude.sessionLimit, "Claude", "sessão 5h")
-            ring(snapshot.claude.weeklyLimit, "Claude", "semanal")
-            ring(snapshot.codex.sessionLimit, "Codex", "sessão 5h")
-            ring(snapshot.codex.weeklyLimit, "Codex", "semanal")
+            ring(snapshot.claude.sessionLimit, "Claude", "sessão 5h", Tint.claude)
+            ring(snapshot.claude.weeklyLimit, "Claude", "semanal", Tint.claude)
+            ring(snapshot.codex.sessionLimit, "Codex", "sessão 5h", Tint.codex)
+            ring(snapshot.codex.weeklyLimit, "Codex", "semanal", Tint.codex)
         }
     }
 
-    private func ring(_ gauge: LimitGauge?, _ caption: String, _ window: String) -> some View {
+    private func ring(_ gauge: LimitGauge?, _ caption: String, _ window: String, _ tint: Color) -> some View {
         let detail: String?
         if let reset = gauge?.resetsAt {
             // Reset distante vira dia da semana; perto, o horário.
@@ -83,7 +83,7 @@ struct RingRow: View {
                     caption: caption,
                     window: window,
                     detail: detail,
-                    color: gauge?.severity.color ?? .secondary,
+                    color: gauge?.color(tint: tint) ?? .secondary,
                     isEmpty: gauge == nil)
     }
 }

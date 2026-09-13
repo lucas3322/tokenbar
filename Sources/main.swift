@@ -2,12 +2,14 @@ import AppKit
 import SwiftUI
 import Combine
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panel: HUDPanel!
     private var outsideClickMonitor: Any?
     private let isPreview = CommandLine.arguments.contains("--preview")
     private let monitor = UsageMonitor()
+    private let updater = Updater()
     private var cancellables = Set<AnyCancellable>()
     private var hoverWork: DispatchWorkItem?
     private var closeWork: DispatchWorkItem?
@@ -21,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let initial: Tab = CommandLine.arguments.contains("--tab=claude") ? .claude
             : CommandLine.arguments.contains("--tab=codex") ? .codex
             : CommandLine.arguments.contains("--tab=ajustes") ? .settings : .overview
-        let host = NSHostingView(rootView: PopoverView(monitor: monitor, tab: initial))
+        let host = NSHostingView(rootView: PopoverView(monitor: monitor, updater: updater, tab: initial))
         panel = HUDPanel(content: host)
 
         monitor.$snapshot
@@ -31,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         installHoverTracking()
         monitor.start()
+        updater.iniciar()
 
         // Modo de inspeção visual: abre o painel sozinho, sem depender do mouse.
         if CommandLine.arguments.contains("--preview") {
@@ -173,8 +176,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.accessory)
-app.run()
+// O código de topo roda fora do contexto isolado; o delegate precisa nascer
+// na main thread porque observa estado de UI.
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    // Mantém a referência viva: o NSApplication guarda o delegate fracamente.
+    objc_setAssociatedObject(app, "tokenbar.delegate", delegate, .OBJC_ASSOCIATION_RETAIN)
+    app.setActivationPolicy(.accessory)
+    app.run()
+}

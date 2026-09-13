@@ -8,8 +8,9 @@ estimado e a sessão que está rodando.
 CC 24%  CX 4%      ← barra de menus: quanto já foi usado da janela de 5h de cada ferramenta
 ```
 
-App nativo (AppKit + SwiftUI). Não faz conexão de rede, não lê credenciais e não envia nada
-para lugar nenhum — tudo vem dos logs que as duas ferramentas já gravam na sua máquina.
+App nativo (AppKit + SwiftUI). Não lê credenciais e não envia dado algum — tudo vem dos logs
+que as duas ferramentas já gravam na sua máquina. A única conexão de rede é a verificação de
+versão nova, desligável nos Ajustes.
 
 **Requisitos:** macOS 14 ou superior · Mac com Apple Silicon (M1 em diante) · usar Claude Code
 e/ou Codex localmente.
@@ -211,6 +212,26 @@ quem recebe. Para distribuir sem nenhum atrito seria preciso Developer ID e nota
 (conta Apple Developer, US$ 99/ano).
 
 ---
+
+## Atualização automática
+
+Nos **Ajustes** o app verifica se há versão nova, baixa e se instala sozinho. A verificação
+roda a cada 6 horas e pode ser desligada ali mesmo.
+
+A fonte é a API pública de releases do repositório (`updateRepo` no config). **Isso exige que
+o repositório permaneça público**: tornando-o privado, a API passa a pedir autenticação e o
+app avisa que não conseguiu verificar, em vez de falhar em silêncio.
+
+Antes de trocar o app instalado, o pacote baixado é conferido: precisa conter um
+`TokenBar.app` cujo `Info.plist` declare exatamente a versão anunciada. A troca é feita por
+um script que espera o processo sair, substitui o bundle e reabre — um app não consegue se
+sobrescrever enquanto roda.
+
+| Chave do config | Para quê | Padrão |
+|---|---|---|
+| `updateRepo` | repositório consultado | `lucas3322/tokenbar` |
+| `autoCheckUpdates` | verificar sozinho | `true` |
+| `updateCheckHours` | intervalo entre verificações | `6` |
 
 ## Versionamento
 

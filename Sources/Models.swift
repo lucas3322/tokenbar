@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// Contagem bruta de tokens de uma requisição, antes de qualquer precificação.
 struct RawUsage: Codable {
@@ -71,6 +72,13 @@ struct LimitGauge {
 
 enum Severity { case ok, warn, critical }
 
+extension LimitGauge {
+    /// Abaixo de 60% vale a cor da ferramenta; a partir daí, o alerta assume.
+    func color(tint: Color) -> Color {
+        severity == .ok ? tint : severity.color
+    }
+}
+
 /// Sessão em execução no momento.
 struct ActiveSession {
     var project: String
@@ -98,6 +106,9 @@ struct ProviderSnapshot {
 
     /// O Claude conta por ciclo semanal fixo; o Codex, por 7 dias.
     var weekLabel: String { name == "Claude Code" ? "ciclo" : "7 dias" }
+
+    /// Cor de identidade da ferramenta.
+    var tint: Color { Tint.of(name) }
 }
 
 struct Snapshot {

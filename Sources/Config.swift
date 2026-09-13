@@ -14,6 +14,10 @@ struct Config {
     var claudeWeeklyResetHour: Int = 12
     /// Preços OpenAI por MTok, ex.: {"gpt-5.6-sol": {"input": 5, "output": 30}}
     var openaiPrices: [String: Rate] = [:]
+    /// Repositório consultado para atualizações. Precisa ser público.
+    var updateRepo: String = "lucas3322/tokenbar"
+    var autoCheckUpdates: Bool = true
+    var updateCheckHours: Double = 6
 
     static var url: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".tokenbar/config.json")
@@ -22,6 +26,24 @@ struct Config {
     static private(set) var shared = Config.load()
 
     static func reload() { shared = load() }
+
+    /// Grava uma única chave preservando o resto do arquivo, inclusive comentários
+    /// em chaves que começam com "_".
+    static func escrever(chave: String, valor: Any) {
+        var raiz: [String: Any] = [:]
+        if let dados = try? Data(contentsOf: url),
+           let existente = try? JSONSerialization.jsonObject(with: dados) as? [String: Any] {
+            raiz = existente
+        }
+        raiz[chave] = valor
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
+        if let dados = try? JSONSerialization.data(withJSONObject: raiz,
+                                                   options: [.prettyPrinted, .sortedKeys]) {
+            try? dados.write(to: url, options: .atomic)
+        }
+        reload()
+    }
 
     static func load() -> Config {
         var config = Config()
@@ -38,6 +60,10 @@ struct Config {
         if let hour = (root["claudeWeeklyResetHour"] as? NSNumber)?.intValue, (0...23).contains(hour) {
             config.claudeWeeklyResetHour = hour
         }
+
+        if let repo = root["updateRepo"] as? String { config.updateRepo = repo }
+        if let auto = root["autoCheckUpdates"] as? Bool { config.autoCheckUpdates = auto }
+        if let horas = (root["updateCheckHours"] as? NSNumber)?.doubleValue { config.updateCheckHours = max(1, horas) }
 
         if let prices = root["openaiPrices"] as? [String: [String: Any]] {
             for (model, entry) in prices {

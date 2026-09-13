@@ -11,6 +11,7 @@ enum Tab: String, CaseIterable, Identifiable {
 struct PopoverView: View {
     @ObservedObject var monitor: UsageMonitor
     @StateObject private var settings = SettingsStore()
+    @ObservedObject var updater: Updater
     @State var tab: Tab = .overview
 
     var body: some View {
@@ -37,7 +38,7 @@ struct PopoverView: View {
                     case .codex:
                         ProviderDetail(provider: monitor.snapshot.codex)
                     case .settings:
-                        SettingsTab(store: settings, monitor: monitor)
+                        SettingsTab(store: settings, monitor: monitor, updater: updater)
                     }
                 }
                 .padding(14)
@@ -57,6 +58,16 @@ struct PopoverView: View {
             Text("TokenBar")
                 .font(.system(size: 13, weight: .semibold))
             Spacer()
+            if case .disponivel = updater.estado {
+                Button { tab = .settings } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.down.circle.fill").font(.system(size: 9))
+                        Text("atualizar").font(.system(size: 10))
+                    }
+                    .foregroundStyle(Tint.codex)
+                }
+                .buttonStyle(.plain)
+            }
             if monitor.isRefreshing {
                 ProgressView().controlSize(.small).scaleEffect(0.7)
             }
@@ -147,14 +158,15 @@ struct ProviderCard: View {
             if let note = provider.note {
                 Text(note).font(.system(size: 11)).foregroundStyle(.secondary)
             } else {
-                GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit)
-                GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, emptyHint: "defina o teto no config")
+                GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit, tint: provider.tint)
+                GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, tint: provider.tint,
+                         emptyHint: "defina o teto no config")
 
                 if let session = provider.activeSession {
                     HStack(spacing: 5) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 5))
-                            .foregroundStyle(Severity.ok.color)
+                            .foregroundStyle(provider.tint)
                         Text(session.project).lineLimit(1)
                         Text("·").foregroundStyle(.tertiary)
                         Text("ctx \(Fmt.percent(session.contextPercent))")
@@ -186,8 +198,9 @@ struct ProviderDetail: View {
             }
 
             Panel(title: "LIMITES") {
-                GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit)
-                GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, emptyHint: "defina claudeWeeklyCostCeiling no config")
+                GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit, tint: provider.tint)
+                GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, tint: provider.tint,
+                         emptyHint: "defina claudeWeeklyCostCeiling no config")
                 if provider.sessionLimit?.exact == false {
                     Text("Estimado (\(provider.sessionLimit?.label ?? "")): o Claude Code não expõe o limite localmente. Confira em Ajustes › Calibrar o Claude.")
                         .font(.system(size: 9.5))
@@ -205,7 +218,7 @@ struct ProviderDetail: View {
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
-                    Bar(percent: session.contextPercent, color: Severity.ok.color)
+                    Bar(percent: session.contextPercent, color: provider.tint)
                     HStack {
                         Text("contexto \(Fmt.tokens(session.contextUsed)) / \(Fmt.tokens(session.contextWindow))")
                         Spacer()
@@ -264,6 +277,8 @@ struct Panel<Content: View>: View {
 struct GaugeRow: View {
     let title: String
     let gauge: LimitGauge?
+    /// Cor de identidade da ferramenta; a severidade sobrepõe quando há alerta.
+    var tint: Color = Tint.claude
     /// Texto mostrado quando não há como calcular o percentual.
     var emptyHint: String = "—"
 
@@ -286,7 +301,7 @@ struct GaugeRow: View {
                     }
                     Text(Fmt.percent(gauge.usedPercent))
                         .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(gauge.severity.color)
+                        .foregroundStyle(gauge.color(tint: tint))
                 } else {
                     Text(emptyHint)
                         .font(.system(size: 9.5))
@@ -294,7 +309,7 @@ struct GaugeRow: View {
                 }
             }
             if let gauge {
-                Bar(percent: gauge.usedPercent, color: gauge.severity.color)
+                Bar(percent: gauge.usedPercent, color: gauge.color(tint: tint))
             } else {
                 // Sem dado: trilho vazio, para não sugerir "0% usado".
                 Capsule().fill(Color.primary.opacity(0.06)).frame(height: 5)
@@ -368,7 +383,7 @@ struct ProviderRow: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(provider.activeSession != nil ? Severity.ok.color : Color.secondary.opacity(0.5))
+                    .fill(provider.activeSession != nil ? provider.tint : Color.secondary.opacity(0.5))
                     .frame(width: 6, height: 6)
                 Text(provider.name).font(.system(size: 12, weight: .semibold))
                 if let plan = provider.plan {
@@ -396,7 +411,7 @@ struct ProviderRow: View {
                     HStack(spacing: 5) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 8))
-                            .foregroundStyle(Severity.ok.color)
+                            .foregroundStyle(provider.tint)
                         Text(session.project).lineLimit(1)
                         Text("·").foregroundStyle(.tertiary)
                         Text(Fmt.modelLabel(session.model)).foregroundStyle(.secondary).lineLimit(1)

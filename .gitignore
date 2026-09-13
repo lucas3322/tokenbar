@@ -33,3 +33,6 @@ cache.json
 .vscode/
 .idea/
 *.swp
+
+# Peças de divulgação geradas localmente
+post/

@@ -278,6 +278,18 @@ code, .code {
 .release .dl a { color: var(--text); }
 .release .sha { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 6px; word-break: break-all; }
 
+/* Autoria */
+.author { display: flex; gap: 28px; align-items: flex-start; }
+@media (max-width: 640px) { .author { flex-direction: column; gap: 20px; } }
+.author-mark {
+  flex: none;
+  width: 66px; height: 66px; border-radius: 18px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 20px; font-weight: 600; letter-spacing: .02em;
+  color: var(--ink);
+  background: linear-gradient(140deg, var(--claude), var(--codex));
+}
+
 footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--faint); font-size: 13.5px; }
 .footrow { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
 </style>
@@ -292,6 +304,7 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
       <a href="#numeros">Os números</a>
       <a href="#instalar">Instalar</a>
       <a href="#novidades">Novidades</a>
+      <a href="#autor">Quem fez</a>
     </nav>
   </div>
 </header>
@@ -502,11 +515,35 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
     <div class="releases" id="releases"></div>
   </div>
 </section>
+<section class="section" id="autor">
+  <div class="wrap">
+    <div class="author">
+      <div class="author-mark" aria-hidden="true">LP</div>
+      <div class="author-body">
+        <p class="eyebrow" style="margin-bottom:10px">Quem fez</p>
+        <h2 style="font-size:clamp(24px,2.8vw,31px)">Lucas Pardinho</h2>
+        <p style="color:var(--dim);margin-top:14px;max-width:56ch">
+          Construí o TokenBar porque eu mesmo vivia descobrindo o limite quando ele travava
+          no meio de uma tarefa. É gratuito e continua sendo mantido conforme eu uso.
+        </p>
+        <a class="btn btn-ghost" style="margin-top:22px"
+           href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/>
+          </svg>
+          Conectar no LinkedIn
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
   <div class="wrap footrow">
-    <span>TokenBar · gratuito · feito para uso próprio e compartilhado sem custo</span>
+    <span>TokenBar · gratuito · feito por
+      <a href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener"
+         style="color:var(--dim)">Lucas Pardinho</a></span>
     <span id="rodape"></span>
   </div>
 </footer>

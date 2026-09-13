@@ -1,6 +1,17 @@
 {
-  "atual": "1.2.2",
+  "atual": "1.2.3",
   "versoes": [
+    {
+      "versao": "1.2.3",
+      "data": "2026-09-13",
+      "arquivo": "download/TokenBar-1.2.3-AppleSilicon.zip",
+      "tamanhoKB": 1148,
+      "sha256": "ff757f3f68a75914ed89cb1f61fe97883d2e357d5a0407da42c93d082f08087d",
+      "notas": [
+        "O percentual da sessão do Codex ficava preso no último valor lido quando a janela de 5h virava sem uso. Agora zera e avisa que a janela foi renovada."
+      ],
+      "titulo": "Correção no limite do Codex"
+    },
     {
       "versao": "1.2.2",
       "data": "2026-09-12",

@@ -235,6 +235,25 @@ permite confirmar qual binário está de fato rodando.
 de bibliotecas externas, o equivalente ao `package.json` é o `Package.swift` do Swift
 Package Manager — enquanto não houver dependência, ele só adicionaria cerimônia.
 
+## Publicação automática (CI)
+
+Dois workflows do GitHub Actions, rodando em `macos-15` (Apple Silicon):
+
+- **build** — a cada push e pull request, compila em máquina limpa e confere o bundle:
+  binário arm64, ícone presente e versão do `Info.plist` igual à do arquivo `VERSION`.
+- **release** — ao enviar uma tag `vX.Y.Z`, gera os pacotes e publica uma Release do GitHub
+  com o app, o fonte e o `SHA256SUMS.txt`, já com as instruções de instalação nas notas.
+
+O fluxo para lançar uma versão:
+
+```bash
+./version.sh minor        # grava VERSION, commita e cria a tag
+git push origin main --follow-tags
+```
+
+O workflow recusa a publicação se a tag não bater com o arquivo `VERSION`, para não sair
+uma Release `v1.3.0` contendo um app que se identifica como `1.2.1`.
+
 ## Estrutura do projeto
 
 ```

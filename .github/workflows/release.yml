@@ -1,0 +1,90 @@
+name: release
+
+# Publica uma Release com os pacotes prontos quando uma tag vX.Y.Z é enviada.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag a publicar (ex.: v1.2.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Conferir que a tag bate com o arquivo VERSION
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          ARQUIVO="v$(cat VERSION)"
+          if [ "$TAG" != "$ARQUIVO" ]; then
+            echo "::error::A tag ($TAG) não corresponde ao arquivo VERSION ($ARQUIVO)."
+            echo "Use ./version.sh, que grava os dois de uma vez."
+            exit 1
+          fi
+
+      - name: Gerar os pacotes
+        run: ./dist.sh
+
+      - name: Calcular as somas de verificação
+        id: somas
+        run: |
+          cd dist
+          shasum -a 256 *.zip *.tar.gz > SHA256SUMS.txt
+          {
+            echo 'somas<<FIM'
+            cat SHA256SUMS.txt
+            echo FIM
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publicar a Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSAO="$(cat VERSION)"
+          NOTAS=$(mktemp)
+          cat > "$NOTAS" <<NOTA
+          Consumo de tokens do Claude Code e do Codex na barra de menus do macOS.
+
+          **Requisitos:** macOS 14+ · Mac com Apple Silicon (M1 em diante).
+
+          ## Instalar
+
+          **Opção A — app pronto.** Baixe \`TokenBar-$VERSAO-AppleSilicon.zip\`, descompacte,
+          arraste para Aplicativos. O app é assinado ad-hoc (sem conta paga de desenvolvedor
+          da Apple), então na primeira abertura o macOS bloqueia. Libere uma única vez:
+
+          \`\`\`bash
+          xattr -dr com.apple.quarantine /Applications/TokenBar.app
+          \`\`\`
+
+          **Opção B — compilar.** Baixe \`TokenBar-$VERSAO-fonte.tar.gz\` e rode \`./install.sh --system\`.
+          Não passa pelo bloqueio do macOS e não exige Xcode, só \`xcode-select --install\`.
+
+          Depois de instalar, calibre o Claude em **Ajustes › Calibrar o Claude** — o percentual
+          do Codex já vem exato, o do Claude precisa do seu teto.
+
+          ## Somas de verificação
+
+          \`\`\`
+          ${{ steps.somas.outputs.somas }}
+          \`\`\`
+          NOTA
+
+          gh release create "v$VERSAO" \
+            dist/TokenBar-$VERSAO-AppleSilicon.zip \
+            dist/TokenBar-$VERSAO-fonte.tar.gz \
+            dist/SHA256SUMS.txt \
+            --title "TokenBar $VERSAO" \
+            --notes-file "$NOTAS"

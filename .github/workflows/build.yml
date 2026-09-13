@@ -1,0 +1,30 @@
+name: build
+
+# Verifica que compila em máquina limpa, a cada push e pull request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compilar:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # build.sh deriva o número de build da contagem de commits.
+          fetch-depth: 0
+
+      - name: Compilar o app
+        run: ./build.sh
+
+      - name: Conferir o bundle
+        run: |
+          set -euo pipefail
+          test -x TokenBar.app/Contents/MacOS/TokenBar
+          test -f TokenBar.app/Contents/Resources/AppIcon.icns
+          lipo -archs TokenBar.app/Contents/MacOS/TokenBar | grep -q arm64
+          VERSAO=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" TokenBar.app/Contents/Info.plist)
+          test "$VERSAO" = "$(cat VERSION)"
+          echo "✓ bundle íntegro, versão $VERSAO"

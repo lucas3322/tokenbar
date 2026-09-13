@@ -1,6 +1,18 @@
 {
-  "atual": "1.2.3",
+  "atual": "1.3.0",
   "versoes": [
+    {
+      "versao": "1.3.0",
+      "data": "2026-09-13",
+      "arquivo": "download/TokenBar-1.3.0-AppleSilicon.zip",
+      "tamanhoKB": 1184,
+      "sha256": "369d590810e06ce6a3bad525e49ac5dcf817f9ce1e7b74b89153c8a8cb30468c",
+      "notas": [
+        "Verde para o Claude, azul para o Codex, em todo o painel — com o alerta de limite ainda tendo precedência em laranja e vermelho.",
+        "O app passa a verificar, baixar e instalar versões novas sozinho, pelos Ajustes. É a única conexão de rede que ele faz, e pode ser desligada."
+      ],
+      "titulo": "Cores por ferramenta e atualização automática"
+    },
     {
       "versao": "1.2.3",
       "data": "2026-09-13",

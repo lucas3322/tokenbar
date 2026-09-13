@@ -1,0 +1,19 @@
+{
+  "refreshSeconds": 20,
+  "hoverDelaySeconds": 0.25,
+
+  "_leia": "Os tetos abaixo são PESSOAIS — dependem do seu plano. Os valores de exemplo vieram de uma conta Equipe e não servem para Pro ou Max. Calibre assim: abra o app do Claude em Configurações > Uso, veja o percentual da Sessão atual, e divida o custo que o TokenBar mostra no ciclo por esse percentual. Ex.: TokenBar diz $9.00 e o app diz 20% -> teto = 9.00 / 0.20 = 45.",
+  "claudeSessionCostCeiling": 45.0,
+  "claudeWeeklyCostCeiling": 555.0,
+
+  "_leia_reset": "Dia e hora do reset do limite semanal (1=domingo ... 5=quinta). Confira em Configurações > Uso: a linha 'Reinicia qui., 12:00'.",
+  "claudeWeeklyResetWeekday": 5,
+  "claudeWeeklyResetHour": 12,
+
+  "_leia_precos": "Preços OpenAI por milhão de tokens, usados só para o custo estimado. Atualize quando a OpenAI mudar a tabela. Os preços da Anthropic são fixos no binário.",
+  "openaiPrices": {
+    "gpt-5.6-sol":   { "input": 5.00, "output": 30.00, "cachedInput": 0.50 },
+    "gpt-5.6-terra": { "input": 2.00, "output": 12.00, "cachedInput": 0.20 },
+    "gpt-5.6-luna":  { "input": 0.20, "output": 1.20,  "cachedInput": 0.02 }
+  }
+}

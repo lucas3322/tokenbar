@@ -5,6 +5,7 @@ import SwiftUI
 final class SettingsStore: ObservableObject {
     @Published var launchesAtLogin: Bool = false
     @Published var cacheSize: String = "—"
+    @Published var calibrationResult: String?
 
     static let plistPath = NSHomeDirectory() + "/Library/LaunchAgents/local.tokenbar.plist"
     static var configURL: URL {
@@ -121,6 +122,33 @@ final class SettingsStore: ObservableObject {
         NSApp.terminate(nil)
     }
 
+    /// Converte o percentual real (lido no app do Claude) no teto de custo correspondente,
+    /// e grava no config. O teto muda quando a Anthropic mexe nos limites ou concede bônus,
+    /// então isso precisa ser refeito de vez em quando — daqui leva cinco segundos.
+    func calibrate(realPercent: Double, currentCost: Double, key: String, label: String) {
+        guard realPercent > 0, currentCost > 0 else {
+            calibrationResult = "Informe o percentual que o app do Claude está mostrando."
+            return
+        }
+        let ceiling = currentCost / (realPercent / 100)
+        var root: [String: Any] = [:]
+        if let data = try? Data(contentsOf: Self.configURL),
+           let existing = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            root = existing
+        }
+        root[key] = (ceiling * 100).rounded() / 100
+        root["_calibrado_em"] = ISO8601DateFormatter().string(from: Date())
+
+        try? FileManager.default.createDirectory(at: Self.configURL.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
+        if let data = try? JSONSerialization.data(withJSONObject: root,
+                                                  options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: Self.configURL, options: .atomic)
+        }
+        Config.reload()
+        calibrationResult = String(format: "%@ calibrado: teto de $%.2f", label, ceiling)
+    }
+
     private func shell(_ command: String) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -150,6 +178,10 @@ struct SettingsTab: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
+            }
+
+            Panel(title: "CALIBRAR O CLAUDE") {
+                CalibrationBox(store: store, snapshot: monitor.snapshot.claude)
             }
 
             Panel(title: "CONFIGURAÇÃO") {
@@ -186,6 +218,69 @@ struct SettingsTab: View {
             }
         }
         .onAppear { store.refresh() }
+    }
+}
+
+/// Converte o percentual mostrado pelo app do Claude no teto de custo do TokenBar.
+struct CalibrationBox: View {
+    @ObservedObject var store: SettingsStore
+    let snapshot: ProviderSnapshot
+
+    @State private var sessionPercent = ""
+    @State private var weeklyPercent = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Abra o app do Claude em Configurações › Uso e copie os percentuais para cá. O TokenBar calcula o teto sozinho.")
+                .font(.system(size: 9.5))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            field(title: "Sessão 5h",
+                  placeholder: "ex.: 42",
+                  text: $sessionPercent,
+                  current: snapshot.currentBlock.cost,
+                  key: "claudeSessionCostCeiling",
+                  label: "Sessão")
+
+            field(title: "Semanal",
+                  placeholder: "ex.: 16",
+                  text: $weeklyPercent,
+                  current: snapshot.week.cost,
+                  key: "claudeWeeklyCostCeiling",
+                  label: "Semanal")
+
+            if let result = store.calibrationResult {
+                Text(result)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Severity.ok.color)
+            }
+        }
+    }
+
+    private func field(title: String, placeholder: String, text: Binding<String>,
+                       current: Double, key: String, label: String) -> some View {
+        HStack(spacing: 7) {
+            Text(title)
+                .font(.system(size: 11))
+                .frame(width: 66, alignment: .leading)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(width: 62)
+            Text("%").font(.system(size: 10)).foregroundStyle(.tertiary)
+            Text(Fmt.money(current))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Button("Calibrar") {
+                let value = Double(text.wrappedValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+                store.calibrate(realPercent: value, currentCost: current, key: key, label: label)
+            }
+            .font(.system(size: 10.5))
+            .controlSize(.small)
+            .disabled(text.wrappedValue.isEmpty || current <= 0)
+        }
     }
 }
 

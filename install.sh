@@ -3,11 +3,18 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-./build.sh
-
+# --system instala em /Applications (a pasta Aplicativos que todo mundo enxerga).
+# Sem a flag, instala em ~/Applications, que é pessoal e não pede permissão nenhuma.
 DEST="$HOME/Applications"
+if [ "${1:-}" = "--system" ]; then
+  DEST="/Applications"
+fi
+
+./build.sh
 mkdir -p "$DEST"
-rm -rf "$DEST/TokenBar.app"
+# Remove qualquer cópia antiga, inclusive na outra pasta, para não ficarem duas rodando.
+pkill -f "TokenBar.app/Contents/MacOS/TokenBar" 2>/dev/null || true
+rm -rf "$HOME/Applications/TokenBar.app" "/Applications/TokenBar.app"
 cp -R TokenBar.app "$DEST/"
 
 PLIST="$HOME/Library/LaunchAgents/local.tokenbar.plist"

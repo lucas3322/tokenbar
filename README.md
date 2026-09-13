@@ -68,6 +68,7 @@ No topo ficam três anéis com os limites. Abaixo, três abas:
 
 | Aba | O que mostra |
 |---|---|
+| **Ajustes** | Início no login, calibração, configuração, sair e desinstalar |
 | **Visão geral** | Consumo do dia e do ciclo das duas ferramentas lado a lado, quanto veio de cache, qual sessão está ativa e o total somado |
 | **Claude** | Limites, sessão ativa com a janela de contexto, tokens abertos por entrada/saída/cache e o consumo por modelo |
 | **Codex** | O mesmo, com os percentuais exatos e o plano da conta |
@@ -100,12 +101,18 @@ esse número bater com a realidade, calibre uma vez (leva um minuto) — veja a 
 
 ## Calibrar o Claude (recomendado)
 
-1. Abra o app do Claude em **Configurações → Uso** e anote o percentual de *Sessão atual* e
-   o dia/hora do reset semanal.
-2. Abra o TokenBar na aba **Claude** e veja o custo do ciclo.
-3. Divida um pelo outro. Exemplo: o TokenBar mostra `$9.00` e o app diz `20% usado` →
-   teto = `9.00 / 0.20` = **45**.
-4. Escreva o resultado em `~/.tokenbar/config.json`:
+Faça isso pela própria aba **Ajustes** do painel:
+
+1. Abra o app do Claude em **Configurações → Uso**.
+2. No TokenBar, vá em **Ajustes → Calibrar o Claude**, digite o percentual que o app está
+   mostrando e clique em **Calibrar**. O teto é calculado e gravado sozinho.
+
+Repita quando os dois números divergirem. **Não é "calibrar uma vez e esquecer"**: o teto muda
+quando a Anthropic concede bônus temporários, quando seu plano muda, e a própria conversão de
+consumo em percentual tem uma margem — medições ao longo de uma mesma sessão renderam tetos
+entre $43 e $53. Recalibrar leva cinco segundos.
+
+Quem preferir editar na mão, o arquivo é `~/.tokenbar/config.json`:
 
 ```bash
 cp config.example.json ~/.tokenbar/config.json
@@ -113,16 +120,14 @@ cp config.example.json ~/.tokenbar/config.json
 
 ```json
 {
-  "claudeSessionCostCeiling": 45.0,
-  "claudeWeeklyCostCeiling": 555.0,
+  "claudeSessionCostCeiling": 53.62,
+  "claudeWeeklyCostCeiling": 533.0,
   "claudeWeeklyResetWeekday": 5,
   "claudeWeeklyResetHour": 12
 }
 ```
 
 O teto depende do seu plano (Pro, Max, Equipe), então cada pessoa precisa calibrar o seu.
-Se o seu plano estiver com limite temporariamente aumentado, o teto muda quando o bônus
-acabar — vale recalibrar.
 
 ### Todas as opções de configuração
 

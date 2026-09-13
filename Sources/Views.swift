@@ -19,13 +19,9 @@ struct PopoverView: View {
             RingRow(snapshot: monitor.snapshot)
                 .padding(.horizontal, 14)
                 .padding(.bottom, 12)
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
+            TabBar(selection: $tab)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
 
             Divider()
 
@@ -193,7 +189,7 @@ struct ProviderDetail: View {
                 GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit)
                 GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, emptyHint: "defina claudeWeeklyCostCeiling no config")
                 if provider.sessionLimit?.exact == false {
-                    Text("Percentuais estimados: o Claude Code não expõe o limite localmente. A base é o seu maior bloco histórico — ajuste em ~/.tokenbar/config.json.")
+                    Text("Estimado (\(provider.sessionLimit?.label ?? "")): o Claude Code não expõe o limite localmente. Confira em Ajustes › Calibrar o Claude.")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -430,5 +426,39 @@ struct ProviderRow: View {
             Text(value).font(.system(size: 12, weight: .medium, design: .rounded))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Seletor de abas próprio. O `Picker` segmentado do sistema tem largura intrínseca e não
+/// preenche o painel — aqui cada aba divide o espaço em partes iguais.
+struct TabBar: View {
+    @Binding var selection: Tab
+    @Namespace private var highlight
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Tab.allCases) { tab in
+                let isSelected = tab == selection
+                Text(tab.rawValue)
+                    .font(.system(size: 11.5, weight: isSelected ? .medium : .regular))
+                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 5)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.primary.opacity(0.14))
+                                .matchedGeometryEffect(id: "aba", in: highlight)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeOut(duration: 0.16)) { selection = tab }
+                    }
+            }
+        }
+        .padding(2)
+        .background(Color.primary.opacity(0.055),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

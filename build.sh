@@ -6,6 +6,11 @@ cd "$(dirname "$0")"
 APP="TokenBar.app"
 BIN="$APP/Contents/MacOS/TokenBar"
 
+# Fonte única da verdade da versão. Mude com ./version.sh, nunca aqui.
+VERSION="$(cat VERSION)"
+# Número de build = quantidade de commits. Sempre cresce, como o macOS espera.
+BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
@@ -38,8 +43,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key><string>TokenBar</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+    <key>CFBundleVersion</key><string>__BUILD__</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
@@ -47,7 +52,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+# Substitui os marcadores do plist pelos valores reais.
+/usr/bin/sed -i '' "s/__VERSION__/$VERSION/; s/__BUILD__/$BUILD/" "$APP/Contents/Info.plist"
+
 # Assinatura ad-hoc: o app roda localmente sem conta de desenvolvedor.
 codesign --force --deep --sign - "$APP" 2>/dev/null || true
 
-echo "✓ $APP pronto"
+echo "✓ $APP pronto — versão $VERSION (build $BUILD)"

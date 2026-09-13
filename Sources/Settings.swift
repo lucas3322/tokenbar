@@ -25,7 +25,10 @@ final class SettingsStore: ObservableObject {
     }
 
     var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (build \(build))"
     }
 
     /// Cria ou remove o LaunchAgent que faz o app subir no login.

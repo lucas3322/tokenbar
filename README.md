@@ -212,6 +212,29 @@ quem recebe. Para distribuir sem nenhum atrito seria preciso Developer ID e nota
 
 ---
 
+## Versionamento
+
+A versão vive num único lugar: o arquivo `VERSION`. O `build.sh` lê dali e escreve no
+`Info.plist`, e o `dist.sh` usa no nome dos pacotes. O número de build é a contagem de
+commits, então sempre cresce — que é o que o macOS espera para reconhecer uma atualização.
+
+Para subir a versão, no espírito do `npm version`:
+
+```bash
+./version.sh patch     # 1.1.0 -> 1.1.1   correções
+./version.sh minor     # 1.1.0 -> 1.2.0   recursos novos
+./version.sh major     # 1.1.0 -> 2.0.0   quebra de compatibilidade
+./version.sh 2.3.1     # define exatamente
+```
+
+Cada chamada grava o `VERSION`, cria o commit e a tag `vX.Y.Z`, e recompila. Use
+`--no-git` para só trocar o número. A versão e o build aparecem na aba Ajustes, o que
+permite confirmar qual binário está de fato rodando.
+
+**Dependências:** o projeto não tem nenhuma, só frameworks do sistema. Se um dia precisar
+de bibliotecas externas, o equivalente ao `package.json` é o `Package.swift` do Swift
+Package Manager — enquanto não houver dependência, ele só adicionaria cerimônia.
+
 ## Estrutura do projeto
 
 ```
@@ -227,7 +250,9 @@ Sources/
   Models.swift      tipos do snapshot
   Format.swift      formatação de tokens, dinheiro e tempo
 tools/makeicon/     gerador do ícone do app, desenhado por código
+VERSION             a versão do app, fonte única da verdade
 build.sh            compila o TokenBar.app
+version.sh          sobe a versão, cria commit e tag
 install.sh          compila, instala e habilita no login
 uninstall.sh        remove tudo
 dist.sh             gera os pacotes para compartilhar

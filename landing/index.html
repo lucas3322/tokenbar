@@ -281,6 +281,13 @@ code, .code {
 /* Autoria */
 .author { display: flex; gap: 28px; align-items: flex-start; }
 @media (max-width: 640px) { .author { flex-direction: column; gap: 20px; } }
+.author-role { font-size: 16px; font-weight: 500; color: var(--text); margin-top: 14px; }
+.author-stack {
+  font-family: var(--mono); font-size: 12.5px; color: var(--dim);
+  margin-top: 10px; line-height: 1.7; max-width: 58ch;
+}
+.author-focus { font-size: 14.5px; color: var(--faint); margin-top: 8px; }
+
 .author-mark {
   flex: none;
   width: 66px; height: 66px; border-radius: 18px;
@@ -522,10 +529,9 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
       <div class="author-body">
         <p class="eyebrow" style="margin-bottom:10px">Quem fez</p>
         <h2 style="font-size:clamp(24px,2.8vw,31px)">Lucas Pardinho</h2>
-        <p style="color:var(--dim);margin-top:14px;max-width:56ch">
-          Construí o TokenBar porque eu mesmo vivia descobrindo o limite quando ele travava
-          no meio de uma tarefa. É gratuito e continua sendo mantido conforme eu uso.
-        </p>
+        <p class="author-role">Engenheiro de Software Sênior &amp; Tech Lead</p>
+        <p class="author-stack">Java · Spring Boot · Node.js · Next.js · TypeScript · Laravel · Python</p>
+        <p class="author-focus">Arquitetura, microsserviços, IA aplicada e liderança de times</p>
         <a class="btn btn-ghost" style="margin-top:22px"
            href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

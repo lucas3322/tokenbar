@@ -1,6 +1,17 @@
 {
-  "atual": "1.3.0",
+  "atual": "1.3.1",
   "versoes": [
+    {
+      "versao": "1.3.1",
+      "data": "2026-09-13",
+      "arquivo": "download/TokenBar-1.3.1-AppleSilicon.zip",
+      "tamanhoKB": 1188,
+      "sha256": "d896b7b003ccfd8565b0d432bcf92fe84ecee5460c9b2b6bd5e39c868f1a62f9",
+      "notas": [
+        "O app passa a escolher a maior versão publicada em vez da publicada por último — releases saindo fora de ordem faziam uma versão antiga ser considerada a mais recente."
+      ],
+      "titulo": "Correção na busca por atualizações"
+    },
     {
       "versao": "1.3.0",
       "data": "2026-09-13",

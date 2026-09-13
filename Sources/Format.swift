@@ -35,6 +35,14 @@ enum Fmt {
         return f.string(from: date)
     }
 
+    /// Dia da semana abreviado, para resets distantes.
+    static func weekday(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "pt_BR")
+        f.dateFormat = "EEE HH:mm"
+        return f.string(from: date).replacingOccurrences(of: ".", with: "")
+    }
+
     /// Nome curto do modelo para caber na lista.
     static func modelLabel(_ raw: String) -> String {
         var name = raw.replacingOccurrences(of: "|fast", with: " ⚡︎")

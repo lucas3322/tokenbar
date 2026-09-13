@@ -4,6 +4,7 @@ import SwiftUI
 struct Ring: View {
     let percent: Double
     let caption: String
+    let window: String
     let detail: String?
     let color: Color
     /// Quando não há percentual calculável, o anel fica vazio em vez de mostrar 0%.
@@ -31,15 +32,21 @@ struct Ring: View {
                     .foregroundStyle(isEmpty ? Color.secondary : Color.primary)
                     .monospacedDigit()
             }
-            .frame(width: 54, height: 54)
+            .frame(width: 50, height: 50)
 
-            Text(caption)
-                .font(.system(size: 10.5, weight: .medium))
-                .lineLimit(1)
-            Text(detail ?? " ")
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
+            VStack(spacing: 1) {
+                Text(caption)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                Text(window)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(detail ?? " ")
+                    .font(.system(size: 8.5, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -50,24 +57,29 @@ struct RingRow: View {
     let snapshot: Snapshot
 
     var body: some View {
-        HStack(spacing: 4) {
-            ring(for: snapshot.claude.sessionLimit, caption: "Claude 5h")
-            ring(for: snapshot.codex.sessionLimit, caption: "Codex 5h")
-            ring(for: snapshot.codex.weeklyLimit, caption: "Codex semanal")
+        HStack(spacing: 2) {
+            ring(snapshot.claude.sessionLimit, "Claude", "sessão 5h")
+            ring(snapshot.claude.weeklyLimit, "Claude", "semanal")
+            ring(snapshot.codex.sessionLimit, "Codex", "sessão 5h")
+            ring(snapshot.codex.weeklyLimit, "Codex", "semanal")
         }
     }
 
-    private func ring(for gauge: LimitGauge?, caption: String) -> some View {
+    private func ring(_ gauge: LimitGauge?, _ caption: String, _ window: String) -> some View {
         let detail: String?
         if let reset = gauge?.resetsAt {
-            detail = "reseta \(Fmt.clock(reset))"
+            // Reset distante vira dia da semana; perto, o horário.
+            detail = reset.timeIntervalSinceNow > 36 * 3_600
+                ? "reseta \(Fmt.weekday(reset))"
+                : "reseta \(Fmt.clock(reset))"
         } else if gauge != nil {
             detail = gauge?.exact == true ? nil : "estimado"
         } else {
-            detail = "sem dado"
+            detail = "calibrar"
         }
         return Ring(percent: gauge?.usedPercent ?? 0,
                     caption: caption,
+                    window: window,
                     detail: detail,
                     color: gauge?.severity.color ?? .secondary,
                     isEmpty: gauge == nil)

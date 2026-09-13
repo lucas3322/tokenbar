@@ -95,7 +95,10 @@ jobs:
             gh release edit "v$VERSAO" --title "TokenBar $VERSAO" --notes-file "$NOTAS"
             gh release upload "v$VERSAO" "${ARQUIVOS[@]}" --clobber
           else
+            # --latest explícito: sem isso o GitHub elege a publicada por último,
+            # que pode ser uma versão antiga quando a fila atrasa uma tag.
             gh release create "v$VERSAO" "${ARQUIVOS[@]}" \
               --title "TokenBar $VERSAO" \
-              --notes-file "$NOTAS"
+              --notes-file "$NOTAS" \
+              --latest
           fi

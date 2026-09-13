@@ -54,8 +54,12 @@ final class Updater: ObservableObject {
         if !silencioso { estado = .verificando }
 
         let repo = Config.shared.updateRepo
+        // Deliberadamente NÃO usa /releases/latest: esse endpoint devolve a release
+        // publicada mais recentemente, não a de maior versão. Publicações fora de
+        // ordem — fila de runner atrasando uma tag antiga — fazem uma versão velha
+        // virar "latest" e o app nunca enxergaria a nova.
         guard !repo.isEmpty,
-              let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
+              let url = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20") else {
             estado = .erro("repositório de atualização não configurado")
             return
         }
@@ -73,14 +77,25 @@ final class Updater: ObservableObject {
                     : "GitHub respondeu \(http.statusCode)")
                 return
             }
-            guard let raiz = try JSONSerialization.jsonObject(with: dados) as? [String: Any],
-                  let tag = raiz["tag_name"] as? String,
-                  let ativos = raiz["assets"] as? [[String: Any]] else {
+            guard let lista = try JSONSerialization.jsonObject(with: dados) as? [[String: Any]] else {
                 estado = .erro("resposta inesperada do GitHub")
                 return
             }
 
-            let publicada = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+            // Maior versão entre as releases publicadas, ignorando rascunhos e prévias.
+            let candidatas: [(versao: String, ativos: [[String: Any]])] = lista.compactMap { item in
+                guard (item["draft"] as? Bool) != true,
+                      (item["prerelease"] as? Bool) != true,
+                      let tag = item["tag_name"] as? String else { return nil }
+                let v = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                return (v, item["assets"] as? [[String: Any]] ?? [])
+            }
+            guard let maior = candidatas.max(by: { Updater.maiorQue($1.versao, $0.versao) }) else {
+                estado = .erro("nenhuma versão publicada")
+                return
+            }
+            let publicada = maior.versao
+            let ativos = maior.ativos
             guard Updater.maiorQue(publicada, versaoAtual) else {
                 estado = .atualizado(versaoAtual)
                 return
@@ -88,7 +103,7 @@ final class Updater: ObservableObject {
             guard let zip = ativos.first(where: { ($0["name"] as? String)?.hasSuffix("-AppleSilicon.zip") == true }),
                   let endereco = zip["browser_download_url"] as? String,
                   let destino = URL(string: endereco) else {
-                estado = .erro("a release \(tag) não traz o instalador")
+                estado = .erro("a release \(publicada) não traz o instalador")
                 return
             }
             estado = .disponivel(versao: publicada,

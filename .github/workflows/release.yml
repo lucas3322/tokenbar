@@ -82,9 +82,20 @@ jobs:
           \`\`\`
           NOTA
 
-          gh release create "v$VERSAO" \
-            dist/TokenBar-$VERSAO-AppleSilicon.zip \
-            dist/TokenBar-$VERSAO-fonte.tar.gz \
-            dist/SHA256SUMS.txt \
-            --title "TokenBar $VERSAO" \
-            --notes-file "$NOTAS"
+          ARQUIVOS=(
+            "dist/TokenBar-$VERSAO-AppleSilicon.zip"
+            "dist/TokenBar-$VERSAO-fonte.tar.gz"
+            "dist/SHA256SUMS.txt"
+          )
+
+          # Idempotente de propósito: reexecutar o workflow para a mesma tag é
+          # comum (fila do runner, republicação manual) e não pode falhar.
+          if gh release view "v$VERSAO" >/dev/null 2>&1; then
+            echo "Release v$VERSAO já existe — atualizando notas e arquivos."
+            gh release edit "v$VERSAO" --title "TokenBar $VERSAO" --notes-file "$NOTAS"
+            gh release upload "v$VERSAO" "${ARQUIVOS[@]}" --clobber
+          else
+            gh release create "v$VERSAO" "${ARQUIVOS[@]}" \
+              --title "TokenBar $VERSAO" \
+              --notes-file "$NOTAS"
+          fi

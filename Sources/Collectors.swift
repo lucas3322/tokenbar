@@ -381,6 +381,14 @@ enum CodexCollector {
         let minutes = JSON.int(dict, "window_minutes")
         let resets = (dict["resets_at"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) }
         let label = minutes > 0 ? windowLabel(minutes: minutes) : fallbackLabel
+
+        // O Codex só grava o percentual quando faz uma requisição. Se a janela já virou
+        // desde o último registro, aquele número é de um período que não existe mais —
+        // e como nenhuma requisição nova apareceu, o consumo da janela atual é zero.
+        if let resets, resets <= Date() {
+            return LimitGauge(usedPercent: 0, resetsAt: nil, exact: false, label: "janela renovada")
+        }
+
         return LimitGauge(usedPercent: percent, resetsAt: resets, exact: true, label: label)
     }
 

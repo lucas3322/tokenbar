@@ -72,8 +72,10 @@ struct RingRow: View {
             detail = reset.timeIntervalSinceNow > 36 * 3_600
                 ? "reseta \(Fmt.weekday(reset))"
                 : "reseta \(Fmt.clock(reset))"
-        } else if gauge != nil {
-            detail = gauge?.exact == true ? nil : "estimado"
+        } else if let gauge {
+            // Sem horário de reset: ou é estimativa local, ou a janela virou e ainda
+            // não houve uso para o servidor informar a nova.
+            detail = gauge.exact ? nil : gauge.label
         } else {
             detail = "calibrar"
         }

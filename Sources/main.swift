@@ -19,7 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         let initial: Tab = CommandLine.arguments.contains("--tab=claude") ? .claude
-            : CommandLine.arguments.contains("--tab=codex") ? .codex : .overview
+            : CommandLine.arguments.contains("--tab=codex") ? .codex
+            : CommandLine.arguments.contains("--tab=ajustes") ? .settings : .overview
         let host = NSHostingView(rootView: PopoverView(monitor: monitor, tab: initial))
         panel = HUDPanel(content: host)
 

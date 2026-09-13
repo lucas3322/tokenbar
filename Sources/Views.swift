@@ -4,11 +4,13 @@ enum Tab: String, CaseIterable, Identifiable {
     case overview = "Visão geral"
     case claude = "Claude"
     case codex = "Codex"
+    case settings = "Ajustes"
     var id: String { rawValue }
 }
 
 struct PopoverView: View {
     @ObservedObject var monitor: UsageMonitor
+    @StateObject private var settings = SettingsStore()
     @State var tab: Tab = .overview
 
     var body: some View {
@@ -38,6 +40,8 @@ struct PopoverView: View {
                         ProviderDetail(provider: monitor.snapshot.claude)
                     case .codex:
                         ProviderDetail(provider: monitor.snapshot.codex)
+                    case .settings:
+                        SettingsTab(store: settings, monitor: monitor)
                     }
                 }
                 .padding(14)
@@ -46,7 +50,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 420)
+        .frame(width: 440)
         .frame(minHeight: 430, maxHeight: 600)
     }
 
@@ -105,12 +109,14 @@ struct PopoverView: View {
                 .foregroundStyle(.tertiary)
 
             Button {
-                NSApplication.shared.terminate(nil)
+                tab = .settings
             } label: {
-                Text("Sair").font(.system(size: 11))
+                Image(systemName: "gearshape")
+                    .font(.system(size: 11))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
+            .help("Ajustes")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)

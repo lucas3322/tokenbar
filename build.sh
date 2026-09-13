@@ -9,6 +9,18 @@ BIN="$APP/Contents/MacOS/TokenBar"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
+# Ícone: desenhado por código, gerado só quando ainda não existe.
+if [ ! -f "Resources/AppIcon.icns" ]; then
+  echo "gerando ícone..."
+  mkdir -p Resources
+  swiftc -O -target arm64-apple-macos14.0 -framework AppKit \
+    -o tools/makeicon/makeicon tools/makeicon/main.swift
+  ./tools/makeicon/makeicon build/AppIcon.iconset
+  iconutil -c icns build/AppIcon.iconset -o Resources/AppIcon.icns
+  rm -rf build
+fi
+cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+
 swiftc -O -whole-module-optimization \
   -target arm64-apple-macos14.0 \
   -framework AppKit -framework SwiftUI -framework Combine \
@@ -24,6 +36,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleDisplayName</key><string>TokenBar</string>
     <key>CFBundleIdentifier</key><string>local.tokenbar</string>
     <key>CFBundleExecutable</key><string>TokenBar</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>

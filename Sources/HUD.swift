@@ -5,7 +5,7 @@ import SwiftUI
 /// fundo translúcido e sem roubar o foco da janela em que você está trabalhando.
 final class HUDPanel: NSPanel {
     init(content: NSView) {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 420, height: 520),
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 440, height: 520),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered,
                    defer: false)
@@ -60,7 +60,7 @@ final class HUDPanel: NSPanel {
     /// Desce a partir da barra, com fade. É o gesto que dá a sensação de "abrir do topo".
     func present(below anchor: NSRect, on screen: NSScreen) {
         let size = contentView?.fittingSize ?? frame.size
-        let width = max(size.width, 420)
+        let width = max(size.width, 440)
         let height = max(size.height, 260)
 
         var x = anchor.midX - width / 2

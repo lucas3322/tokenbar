@@ -23,7 +23,7 @@ ditto -c -k --sequesterRsrc --keepParent \
 rm -f "$OUT/.sources.zip"
 tar --exclude='TokenBar.app' --exclude='dist' --exclude='.probe' \
     -czf "$OUT/TokenBar-$VERSION-fonte.tar.gz" \
-    Sources build.sh install.sh uninstall.sh dist.sh README.md config.example.json
+    Sources tools Resources build.sh install.sh uninstall.sh dist.sh README.md config.example.json
 
 cat > "$OUT/LEIA-ME.txt" <<'TXT'
 TokenBar — consumo de tokens do Claude Code e do Codex na barra de menus

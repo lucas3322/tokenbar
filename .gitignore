@@ -1,0 +1,35 @@
+# Produto da compilação — gerado por ./build.sh, nunca versionado
+TokenBar.app/
+build/
+
+# Pacotes de distribuição — gerados por ./dist.sh
+dist/
+
+# Ícone gerado por código a partir de tools/makeicon
+Resources/AppIcon.icns
+*.iconset/
+
+# Binários e artefatos de compilação
+tools/makeicon/makeicon
+.probe/probe
+*.o
+*.dSYM/
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
+
+# Configuração e cache são por máquina e ficam em ~/.tokenbar,
+# mas se alguém copiar para cá por engano, não sobe.
+config.json
+cache.json
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editores
+.vscode/
+.idea/
+*.swp

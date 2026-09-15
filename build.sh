@@ -26,11 +26,42 @@ if [ ! -f "Resources/AppIcon.icns" ]; then
 fi
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 
-swiftc -O -whole-module-optimization \
-  -target arm64-apple-macos14.0 \
-  -framework AppKit -framework SwiftUI -framework Combine \
-  -o "$BIN" \
-  Sources/*.swift
+# Escolha da SDK.
+#
+# A partir da SDK 27, o SwiftUI declara @State como macro, e o plugin que expande
+# essa macro (SwiftUIMacros) só é distribuído com o Xcode — não com os Command Line
+# Tools. Com CLT apenas, compilar contra a 27 falha com "plugin for module
+# SwiftUIMacros not found".
+#
+# Então: tenta a SDK padrão primeiro (que funciona com Xcode instalado e voltará a
+# funcionar quando os CLT passarem a trazer o plugin) e, se falhar, cai para a SDK
+# mais nova anterior à 27, que declara @State como property wrapper.
+compilar() {
+  swiftc -O -whole-module-optimization \
+    -target arm64-apple-macos14.0 \
+    ${1:+-sdk "$1"} \
+    -framework AppKit -framework SwiftUI -framework Combine \
+    -o "$BIN" \
+    Sources/*.swift
+}
+
+if ! compilar "" 2>/tmp/tokenbar-build.log; then
+  if grep -q 'SwiftUIMacros' /tmp/tokenbar-build.log; then
+    ALTERNATIVA=$(ls -d /Library/Developer/CommandLineTools/SDKs/MacOSX2[0-6].*.sdk 2>/dev/null | sort -V | tail -1)
+    if [ -n "$ALTERNATIVA" ]; then
+      echo "SDK padrão exige o plugin SwiftUIMacros (só vem no Xcode) — usando $(basename "$ALTERNATIVA")"
+      compilar "$ALTERNATIVA"
+    else
+      echo "ERRO: a SDK padrão exige o plugin SwiftUIMacros e não há SDK alternativa instalada."
+      echo "Instale o Xcode ou uma SDK anterior à 27."
+      cat /tmp/tokenbar-build.log >&2
+      exit 1
+    fi
+  else
+    cat /tmp/tokenbar-build.log >&2
+    exit 1
+  fi
+fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

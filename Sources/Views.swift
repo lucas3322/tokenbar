@@ -150,6 +150,10 @@ struct ProviderCard: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                // Sem o rótulo, este valor era lido como "custo do cartão" ou "da sessão".
+                Text("hoje")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
                 Text(Fmt.money(provider.today.cost))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
@@ -394,6 +398,9 @@ struct ProviderRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Text("hoje")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
                 Text(Fmt.money(provider.today.cost))
                     .font(.system(size: 11.5, weight: .medium, design: .monospaced))
             }

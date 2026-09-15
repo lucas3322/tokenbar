@@ -122,8 +122,9 @@ enum ClaudeCollector {
         let timeline = cache.timeline(since: cutoff, pathPrefix: Paths.claudeProjects.path)
         snapshot.today = aggregate(timeline, since: Calendar.current.startOfDay(for: Date()))
         let weekly = weeklyLimit(timeline: timeline)
-        // "Semana" aqui é o ciclo de cobrança real, não 7 dias para trás.
+        // "Semana" aqui é a janela do limite semanal, não 7 dias para trás.
         snapshot.week = weekly.used
+        snapshot.weekIsCycle = true
 
         let blocks = fiveHourBlocks(from: timeline)
         let hits = cache.limitHits(since: cutoff, pathPrefix: Paths.claudeProjects.path)
@@ -316,17 +317,24 @@ enum CodexCollector {
         }
 
         let timeline = cache.timeline(since: cutoff, pathPrefix: Paths.codexSessions.path)
+
+        // Os limites vêm antes do agregado: é o servidor quem diz quando a janela
+        // semanal começou, e sem isso restaria somar 7 dias corridos — que mediria
+        // coisa diferente do cartão do Claude, ali do lado.
+        if let latest = files.first { applyLiveState(from: latest, to: &snapshot) }
+
+        let inicioSemana = snapshot.weeklyWindowStart ?? Date().addingTimeInterval(-7 * 86_400)
+        snapshot.weekIsCycle = snapshot.weeklyWindowStart != nil
+
         var today = Aggregate(), week = Aggregate()
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        let weekAgo = Date().addingTimeInterval(-7 * 86_400)
         for row in timeline {
             if row.date >= startOfDay { today.add(model: row.model, row.usage) }
-            if row.date >= weekAgo { week.add(model: row.model, row.usage) }
+            if row.date >= inicioSemana { week.add(model: row.model, row.usage) }
         }
         snapshot.today = today
         snapshot.week = week
 
-        if let latest = files.first { applyLiveState(from: latest, to: &snapshot) }
         return snapshot
     }
 
@@ -348,6 +356,14 @@ enum CodexCollector {
                 snapshot.plan = limits["plan_type"] as? String
                 snapshot.sessionLimit = gauge(from: limits["primary"], fallbackLabel: "janela de 5h")
                 snapshot.weeklyLimit = gauge(from: limits["secondary"], fallbackLabel: "janela semanal")
+
+                // resets_at menos a duração da janela dá o instante em que ela abriu.
+                if let secundaria = limits["secondary"] as? [String: Any],
+                   let reset = (secundaria["resets_at"] as? NSNumber)?.doubleValue,
+                   case let minutos = JSON.int(secundaria, "window_minutes"), minutos > 0 {
+                    let inicio = Date(timeIntervalSince1970: reset - Double(minutos) * 60)
+                    if inicio <= Date() { snapshot.weeklyWindowStart = inicio }
+                }
             }
             if let info = payload["info"] as? [String: Any] {
                 if let totals = info["total_token_usage"] as? [String: Any] {

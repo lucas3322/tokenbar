@@ -104,8 +104,12 @@ struct ProviderSnapshot {
     var activeSession: ActiveSession?
     var plan: String?
 
-    /// O Claude conta por ciclo semanal fixo; o Codex, por 7 dias.
-    var weekLabel: String { name == "Claude Code" ? "ciclo" : "7 dias" }
+    /// Início da janela semanal informado pelo servidor, quando existe.
+    var weeklyWindowStart: Date?
+
+    /// `true` quando o total semanal cobre a janela real do limite, e não 7 dias corridos.
+    var weekIsCycle = false
+    var weekLabel: String { weekIsCycle ? "ciclo" : "7 dias" }
 
     /// Cor de identidade da ferramenta.
     var tint: Color { Tint.of(name) }

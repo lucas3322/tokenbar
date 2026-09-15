@@ -51,6 +51,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Clicar no app no Finder ou no Launchpad quando ele já está rodando: sem janela
+    /// e sem ícone no Dock, isso não dava retorno nenhum e parecia que estava quebrado.
+    /// Agora abre o painel, que é a única interface que o app tem.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        showPanel()
+        return true
+    }
+
     // MARK: Barra de menus
 
     /// Título compacto: percentual da janela de 5h de cada ferramenta, colorido pelo nível.

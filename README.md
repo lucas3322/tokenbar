@@ -180,6 +180,16 @@ total não sumir sem aviso.
 
 ## Problemas comuns
 
+**O app não abre quando clico nele.** Provavelmente já está aberto: ele vive na barra de
+menus, sem janela e sem ícone no Dock. Procure a leitura `CC …% CX …%` na barra. A partir da
+1.3.2, clicar no app abre o painel em vez de não dar retorno nenhum.
+
+**`build.sh` falha com "plugin for module SwiftUIMacros not found".** A partir da SDK 27 o
+SwiftUI declara `@State` como macro, e o plugin que a expande só vem com o Xcode. O
+`build.sh` detecta isso e recai na SDK mais nova anterior à 27 — a mensagem aparece no
+build. Se não houver nenhuma instalada, é preciso instalar o Xcode.
+
+
 **O ícone não aparece na barra.** Sua barra pode estar cheia (comum em Mac com notch).
 Esconda outros ícones ou use um organizador de barra de menus. Confirme que está rodando com
 `pgrep -fl TokenBar`.

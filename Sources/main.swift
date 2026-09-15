@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--preview") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
                 guard let self else { return }
-                self.showPanel()
+                self.showPanel(fechaSozinho: false)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                     if let screen = NSScreen.main {
                         let f = self.panel.frame
@@ -55,7 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// e sem ícone no Dock, isso não dava retorno nenhum e parecia que estava quebrado.
     /// Agora abre o painel, que é a única interface que o app tem.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        showPanel()
+        // Sem fechamento automático: o ponteiro está no Finder, longe do painel,
+        // e o temporizador do hover o fecharia meio segundo depois de abrir.
+        showPanel(fechaSozinho: false)
         return true
     }
 
@@ -113,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func mouseEntered(with event: NSEvent) {
         closeWork?.cancel()
         guard !panel.isVisible else { return }
-        let work = DispatchWorkItem { [weak self] in self?.showPanel() }
+        let work = DispatchWorkItem { [weak self] in self?.showPanel(fechaSozinho: true) }
         hoverWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Config.shared.openHoverDelay, execute: work)
     }
@@ -152,10 +154,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover() {
-        panel.isVisible ? panel.dismiss() : showPanel()
+        // Clique no ícone: fica aberto até clicar fora ou o ponteiro se afastar.
+        panel.isVisible ? panel.dismiss() : showPanel(fechaSozinho: true)
     }
 
-    private func showPanel() {
+    private func showPanel(fechaSozinho: Bool) {
         guard let button = statusItem.button,
               let window = button.window,
               let screen = window.screen ?? NSScreen.main else { return }
@@ -163,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
         panel.present(below: anchor, on: screen)
         installOutsideClickMonitor()
-        scheduleAutoClose()
+        if fechaSozinho { scheduleAutoClose() }
     }
 
     /// Um clique fora fecha o painel, como qualquer menu do sistema.

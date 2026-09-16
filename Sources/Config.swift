@@ -18,6 +18,9 @@ struct Config {
     var updateRepo: String = "lucas3322/tokenbar"
     var autoCheckUpdates: Bool = true
     var updateCheckHours: Double = 6
+    /// Avisos de limite.
+    var notifyEnabled: Bool = true
+    var notifyThreshold: Double = 80
 
     static var url: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".tokenbar/config.json")
@@ -64,6 +67,11 @@ struct Config {
         if let repo = root["updateRepo"] as? String { config.updateRepo = repo }
         if let auto = root["autoCheckUpdates"] as? Bool { config.autoCheckUpdates = auto }
         if let horas = (root["updateCheckHours"] as? NSNumber)?.doubleValue { config.updateCheckHours = max(1, horas) }
+
+        if let ligado = root["notifyEnabled"] as? Bool { config.notifyEnabled = ligado }
+        if let limiar = (root["notifyThreshold"] as? NSNumber)?.doubleValue {
+            config.notifyThreshold = min(max(limiar, 1), 100)
+        }
 
         if let prices = root["openaiPrices"] as? [String: [String: Any]] {
             for (model, entry) in prices {

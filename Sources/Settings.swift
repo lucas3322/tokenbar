@@ -165,6 +165,7 @@ struct SettingsTab: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var monitor: UsageMonitor
     @ObservedObject var updater: Updater
+    @ObservedObject var notifier: Notifier
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -182,6 +183,10 @@ struct SettingsTab: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
+            }
+
+            Panel(title: "AVISOS") {
+                NotifyBox(notifier: notifier)
             }
 
             Panel(title: "ATUALIZAÇÕES") {
@@ -226,6 +231,52 @@ struct SettingsTab: View {
             }
         }
         .onAppear { store.refresh() }
+    }
+}
+
+/// Aviso ao passar do limiar de uso.
+struct NotifyBox: View {
+    @ObservedObject var notifier: Notifier
+
+    private let opcoes: [Double] = [60, 70, 80, 90, 95]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $notifier.ativo) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Avisar ao passar do limite").font(.system(size: 11.5))
+                    Text("uma notificação por janela de 5h, de cada ferramenta")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+
+            if notifier.ativo {
+                HStack(spacing: 8) {
+                    Text("Avisar em").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Picker("", selection: $notifier.limiar) {
+                        ForEach(opcoes, id: \.self) { Text("\(Int($0))%").tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: 78)
+                    Spacer()
+                    Button("Testar") { notifier.testar() }
+                        .font(.system(size: 10.5))
+                        .controlSize(.small)
+                }
+                if notifier.permissao != "—" {
+                    Text("permissão: \(notifier.permissao)")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(notifier.permissao == "autorizado"
+                                         ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Severity.warn.color))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 }
 

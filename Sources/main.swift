@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let isPreview = CommandLine.arguments.contains("--preview")
     private let monitor = UsageMonitor()
     private let updater = Updater()
+    private let notifier = Notifier()
     private var cancellables = Set<AnyCancellable>()
     private var hoverWork: DispatchWorkItem?
     private var closeWork: DispatchWorkItem?
@@ -23,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let initial: Tab = CommandLine.arguments.contains("--tab=claude") ? .claude
             : CommandLine.arguments.contains("--tab=codex") ? .codex
             : CommandLine.arguments.contains("--tab=ajustes") ? .settings : .overview
-        let host = NSHostingView(rootView: PopoverView(monitor: monitor, updater: updater, tab: initial))
+        let host = NSHostingView(rootView: PopoverView(monitor: monitor, updater: updater, notifier: notifier, tab: initial))
         panel = HUDPanel(content: host)
 
         monitor.$snapshot
@@ -34,6 +35,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHoverTracking()
         monitor.start()
         updater.iniciar()
+        notifier.iniciar()
+
+        // Cada leitura nova passa pelo avaliador de avisos.
+        monitor.$snapshot
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in self?.notifier.avaliar($0) }
+            .store(in: &cancellables)
 
         // Modo de inspeção visual: abre o painel sozinho, sem depender do mouse.
         if CommandLine.arguments.contains("--preview") {

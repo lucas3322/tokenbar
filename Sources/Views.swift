@@ -12,6 +12,7 @@ struct PopoverView: View {
     @ObservedObject var monitor: UsageMonitor
     @StateObject private var settings = SettingsStore()
     @ObservedObject var updater: Updater
+    @ObservedObject var notifier: Notifier
     @State var tab: Tab = .overview
 
     var body: some View {
@@ -38,7 +39,7 @@ struct PopoverView: View {
                     case .codex:
                         ProviderDetail(provider: monitor.snapshot.codex)
                     case .settings:
-                        SettingsTab(store: settings, monitor: monitor, updater: updater)
+                        SettingsTab(store: settings, monitor: monitor, updater: updater, notifier: notifier)
                     }
                 }
                 .padding(14)

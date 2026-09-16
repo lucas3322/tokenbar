@@ -223,6 +223,24 @@ quem recebe. Para distribuir sem nenhum atrito seria preciso Developer ID e nota
 
 ---
 
+## Avisos de limite
+
+Nos **Ajustes**, o app avisa quando a janela de 5h passa de um limiar — 80% por padrão,
+ajustável entre 60% e 95%. Vale para as duas ferramentas.
+
+Dispara **uma vez por janela e por ferramenta**: o aviso serve para você decidir o que fazer,
+não para repetir a cada atualização até o limite estourar. A janela já avisada fica registrada
+em `~/.tokenbar/avisos.json`, então reiniciar o app não faz o aviso voltar.
+
+Na primeira vez o macOS pede autorização. Se você negar, o estado aparece nos Ajustes e a
+permissão pode ser revista em Ajustes do Sistema › Notificações › TokenBar. O botão **Testar**
+manda um aviso de exemplo para conferir.
+
+| Chave do config | Para quê | Padrão |
+|---|---|---|
+| `notifyEnabled` | ligar os avisos | `true` |
+| `notifyThreshold` | percentual que dispara | `80` |
+
 ## Atualização automática
 
 Nos **Ajustes** o app verifica se há versão nova, baixa e se instala sozinho. A verificação

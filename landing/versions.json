@@ -1,6 +1,17 @@
 {
-  "atual": "1.4.0",
+  "atual": "1.4.1",
   "versoes": [
+    {
+      "versao": "1.4.1",
+      "data": "2026-09-16",
+      "arquivo": "download/TokenBar-1.4.1-AppleSilicon.zip",
+      "tamanhoKB": 1208,
+      "sha256": "b9fb0b660fb1fc09dc73ba0cc4a81f970c5bdbff0baa1c9be2e5047fe7f0906a",
+      "notas": [
+        "Ao atingir o limite, o Codex passa a gravar os campos de limite vazios e o painel apagava os medidores dele. Agora o app procura o último estado válido e continua mostrando o percentual."
+      ],
+      "titulo": "Correção nos limites do Codex"
+    },
     {
       "versao": "1.4.0",
       "data": "2026-09-16",

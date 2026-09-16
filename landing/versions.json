@@ -1,12 +1,12 @@
 {
-  "atual": "1.4.2",
+  "atual": "1.4.3",
   "versoes": [
     {
-      "versao": "1.4.2",
+      "versao": "1.4.3",
       "data": "2026-09-16",
-      "arquivo": "download/TokenBar-1.4.2-AppleSilicon.zip",
-      "tamanhoKB": 1220,
-      "sha256": "f6e6adcca285f54c2261c82c3ade46ecf71c3ca7c8bd00601f1430e04951455f",
+      "arquivo": "download/TokenBar-1.4.3-AppleSilicon.zip",
+      "tamanhoKB": 1216,
+      "sha256": "14a2fafb6c127bbd2e72cf843894c50250d74a5ab06da07d15886a2d3efe6e41",
       "notas": [
         "O aviso de limite passou a ser um banner do próprio app. O Centro de Notificações do macOS recusa aplicativos sem conta paga de desenvolvedor da Apple, então o caminho anterior nunca entregava.",
         "Clique no aviso para abrir o painel."

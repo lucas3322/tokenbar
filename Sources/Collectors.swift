@@ -321,7 +321,7 @@ enum CodexCollector {
         // Os limites vêm antes do agregado: é o servidor quem diz quando a janela
         // semanal começou, e sem isso restaria somar 7 dias corridos — que mediria
         // coisa diferente do cartão do Claude, ali do lado.
-        if let latest = files.first { applyLiveState(from: latest, to: &snapshot) }
+        applyLiveState(from: files, to: &snapshot)
 
         let inicioSemana = snapshot.weeklyWindowStart ?? Date().addingTimeInterval(-7 * 86_400)
         snapshot.weekIsCycle = snapshot.weeklyWindowStart != nil
@@ -338,56 +338,82 @@ enum CodexCollector {
         return snapshot
     }
 
-    /// Lê o fim do rollout mais recente: ali estão os percentuais de limite e o uso da sessão.
-    private static func applyLiveState(from file: (path: String, mtime: Date), to snapshot: inout ProviderSnapshot) {
-        guard let handle = FileHandle(forReadingAtPath: file.path) else { return }
-        defer { try? handle.close() }
-        let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int ?? 0) ?? 0
-        try? handle.seek(toOffset: UInt64(max(0, size - (4 << 20))))
-        guard let data = try? handle.readToEnd(), let text = String(data: data, encoding: .utf8) else { return }
+    /// Lê o fim dos rollouts recentes atrás do último estado de limites utilizável.
+    ///
+    /// Não basta olhar o registro mais novo: ao atingir o limite, o Codex passa a gravar
+    /// `rate_limits` com todos os campos nulos. Parar no primeiro registro encontrado
+    /// apagaria os medidores justamente quando o limite foi atingido — que é quando eles
+    /// mais importam. Então procura para trás até achar um registro com valores.
+    private static func applyLiveState(from files: [(path: String, mtime: Date)], to snapshot: inout ProviderSnapshot) {
+        var limitesDefinidos = false
+        var sessaoDefinida = false
 
-        for line in text.split(separator: "\n").reversed() {
-            guard line.contains("\"token_count\""),
-                  let root = JSON.object(String(line)),
-                  let payload = root["payload"] as? [String: Any],
-                  payload["type"] as? String == "token_count" else { continue }
+        for arquivo in files.prefix(6) {
+            guard let texto = tail(of: arquivo.path, bytes: 4 << 20) else { continue }
 
-            if let limits = payload["rate_limits"] as? [String: Any] {
-                snapshot.plan = limits["plan_type"] as? String
-                snapshot.sessionLimit = gauge(from: limits["primary"], fallbackLabel: "janela de 5h")
-                snapshot.weeklyLimit = gauge(from: limits["secondary"], fallbackLabel: "janela semanal")
+            for linha in texto.split(separator: "\n").reversed() {
+                guard linha.contains("\"token_count\""),
+                      let root = JSON.object(String(linha)),
+                      let payload = root["payload"] as? [String: Any],
+                      payload["type"] as? String == "token_count" else { continue }
 
-                // resets_at menos a duração da janela dá o instante em que ela abriu.
-                if let secundaria = limits["secondary"] as? [String: Any],
-                   let reset = (secundaria["resets_at"] as? NSNumber)?.doubleValue,
-                   case let minutos = JSON.int(secundaria, "window_minutes"), minutos > 0 {
-                    let inicio = Date(timeIntervalSince1970: reset - Double(minutos) * 60)
-                    if inicio <= Date() { snapshot.weeklyWindowStart = inicio }
+                if !sessaoDefinida, let info = payload["info"] as? [String: Any] {
+                    aplicarUso(info: info, arquivo: arquivo, to: &snapshot)
+                    sessaoDefinida = true
                 }
-            }
-            if let info = payload["info"] as? [String: Any] {
-                if let totals = info["total_token_usage"] as? [String: Any] {
-                    var usage = RawUsage()
-                    let cached = JSON.int(totals, "cached_input_tokens")
-                    usage.input = max(0, JSON.int(totals, "input_tokens") - cached)
-                    usage.cacheRead = cached
-                    usage.output = JSON.int(totals, "output_tokens")
-                    snapshot.currentBlock.add(model: "gpt", usage)
-                }
-                if let last = info["last_token_usage"] as? [String: Any] {
-                    let window = JSON.int(info, "model_context_window")
-                    let project = URL(fileURLWithPath: file.path).deletingPathExtension().lastPathComponent
-                    if file.mtime > Date().addingTimeInterval(-180) {
-                        snapshot.activeSession = ActiveSession(
-                            project: String(project.prefix(28)),
-                            model: snapshot.plan.map { "Codex (\($0))" } ?? "Codex",
-                            contextUsed: JSON.int(last, "input_tokens"),
-                            contextWindow: window > 0 ? window : 272_000
-                        )
+
+                if !limitesDefinidos, let limits = payload["rate_limits"] as? [String: Any] {
+                    let primario = gauge(from: limits["primary"], fallbackLabel: "janela de 5h")
+                    // Um registro só serve se trouxer de fato o percentual da janela de 5h.
+                    if primario != nil {
+                        snapshot.plan = limits["plan_type"] as? String
+                        snapshot.sessionLimit = primario
+                        snapshot.weeklyLimit = gauge(from: limits["secondary"], fallbackLabel: "janela semanal")
+
+                        if let secundaria = limits["secondary"] as? [String: Any],
+                           let reset = (secundaria["resets_at"] as? NSNumber)?.doubleValue,
+                           case let minutos = JSON.int(secundaria, "window_minutes"), minutos > 0 {
+                            let inicio = Date(timeIntervalSince1970: reset - Double(minutos) * 60)
+                            if inicio <= Date() { snapshot.weeklyWindowStart = inicio }
+                        }
+                        limitesDefinidos = true
                     }
                 }
+
+                if limitesDefinidos && sessaoDefinida { return }
             }
-            return
+        }
+    }
+
+    /// Últimos `bytes` de um arquivo, como texto.
+    private static func tail(of path: String, bytes: Int) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int ?? 0) ?? 0
+        try? handle.seek(toOffset: UInt64(max(0, size - bytes)))
+        guard let data = try? handle.readToEnd() else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func aplicarUso(info: [String: Any], arquivo: (path: String, mtime: Date), to snapshot: inout ProviderSnapshot) {
+        if let totals = info["total_token_usage"] as? [String: Any] {
+            var usage = RawUsage()
+            let cached = JSON.int(totals, "cached_input_tokens")
+            usage.input = max(0, JSON.int(totals, "input_tokens") - cached)
+            usage.cacheRead = cached
+            usage.output = JSON.int(totals, "output_tokens")
+            snapshot.currentBlock.add(model: "gpt", usage)
+        }
+        if let last = info["last_token_usage"] as? [String: Any],
+           arquivo.mtime > Date().addingTimeInterval(-180) {
+            let window = JSON.int(info, "model_context_window")
+            let projeto = URL(fileURLWithPath: arquivo.path).deletingPathExtension().lastPathComponent
+            snapshot.activeSession = ActiveSession(
+                project: String(projeto.prefix(28)),
+                model: snapshot.plan.map { "Codex (\($0))" } ?? "Codex",
+                contextUsed: JSON.int(last, "input_tokens"),
+                contextWindow: window > 0 ? window : 272_000
+            )
         }
     }
 

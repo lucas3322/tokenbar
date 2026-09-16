@@ -245,7 +245,7 @@ struct NotifyBox: View {
             Toggle(isOn: $notifier.ativo) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Avisar ao passar do limite").font(.system(size: 11.5))
-                    Text("uma notificação por janela de 5h, de cada ferramenta")
+                    Text("um aviso por janela de 5h, de cada ferramenta")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.tertiary)
                 }
@@ -268,13 +268,10 @@ struct NotifyBox: View {
                         .font(.system(size: 10.5))
                         .controlSize(.small)
                 }
-                if notifier.permissao != "—" {
-                    Text("permissão: \(notifier.permissao)")
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(notifier.permissao == "autorizado"
-                                         ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Severity.warn.color))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text("O aviso é desenhado pelo próprio app: o Centro de Notificações do macOS recusa aplicativos sem conta paga de desenvolvedor da Apple.")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

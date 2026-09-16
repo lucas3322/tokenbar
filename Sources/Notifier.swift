@@ -45,8 +45,8 @@ final class Notifier: ObservableObject {
     }
 
     func iniciar() {
-        guard ativo else { return }
-        pedirPermissao()
+        // Nada a preparar: o aviso é uma janela nossa. A autorização do sistema é
+        // solicitada só junto do envio, como tentativa extra.
     }
 
     func pedirPermissao() {

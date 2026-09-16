@@ -232,9 +232,10 @@ Dispara **uma vez por janela e por ferramenta**: o aviso serve para você decidi
 não para repetir a cada atualização até o limite estourar. A janela já avisada fica registrada
 em `~/.tokenbar/avisos.json`, então reiniciar o app não faz o aviso voltar.
 
-Na primeira vez o macOS pede autorização. Se você negar, o estado aparece nos Ajustes e a
-permissão pode ser revista em Ajustes do Sistema › Notificações › TokenBar. O botão **Testar**
-manda um aviso de exemplo para conferir.
+O aviso é um banner desenhado pelo próprio app, no canto superior direito — clique nele para
+abrir o painel. Não usa o Centro de Notificações do macOS: ele recusa aplicativos assinados
+ad-hoc com `"Notifications are not allowed for this application"`, e sem conta paga de
+desenvolvedor da Apple não há como contornar. O botão **Testar** mostra um exemplo.
 
 | Chave do config | Para quê | Padrão |
 |---|---|---|

@@ -79,7 +79,24 @@ final class Notifier: ObservableObject {
         }
     }
 
+    /// Chamado quando o usuário clica no aviso.
+    var aoAbrirPainel: (() -> Void)?
+
     private func enviar(provedor: ProviderSnapshot, medidor: LimitGauge) {
+        var partes = ["janela de 5h"]
+        if let reset = Fmt.countdown(to: medidor.resetsAt) { partes.append("reseta em \(reset)") }
+        if !medidor.exact { partes.append("estimado") }
+
+        AlertBanner.mostrar(titulo: String(format: "%@ em %.0f%%", provedor.name, medidor.usedPercent),
+                            corpo: partes.joined(separator: " · "),
+                            cor: medidor.color(tint: provedor.tint),
+                            aoClicar: { [weak self] in self?.aoAbrirPainel?() })
+        enviarPeloSistema(provedor: provedor, medidor: medidor)
+    }
+
+    /// Tentativa adicional pelo Centro de Notificações — funciona só se o app estiver
+    /// autorizado, o que não acontece com assinatura ad-hoc. Falha em silêncio.
+    private func enviarPeloSistema(provedor: ProviderSnapshot, medidor: LimitGauge) {
         let conteudo = UNMutableNotificationContent()
         conteudo.title = String(format: "%@ em %.0f%%", provedor.name, medidor.usedPercent)
 
@@ -96,17 +113,11 @@ final class Notifier: ObservableObject {
         }
     }
 
-    /// Envia um aviso de exemplo, para conferir se a permissão está de pé.
+    /// Mostra um aviso de exemplo.
     func testar() {
-        let conteudo = UNMutableNotificationContent()
-        conteudo.title = "TokenBar"
-        conteudo.body = String(format: "É assim que o aviso aparece ao passar de %.0f%%.", limiar)
-        conteudo.sound = .default
-        UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: UUID().uuidString, content: conteudo, trigger: nil)) { [weak self] erro in
-            Task { @MainActor in
-                self?.permissao = erro.map { "falhou: \($0.localizedDescription)" } ?? "autorizado"
-            }
-        }
+        AlertBanner.mostrar(titulo: "TokenBar",
+                            corpo: String(format: "É assim que o aviso aparece ao passar de %.0f%%.", limiar),
+                            cor: Tint.claude,
+                            aoClicar: { [weak self] in self?.aoAbrirPainel?() })
     }
 }

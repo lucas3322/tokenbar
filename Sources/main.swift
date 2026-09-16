@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHoverTracking()
         monitor.start()
         updater.iniciar()
+        notifier.aoAbrirPainel = { [weak self] in self?.showPanel(fechaSozinho: false) }
         notifier.iniciar()
 
         // Cada leitura nova passa pelo avaliador de avisos.

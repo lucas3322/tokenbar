@@ -83,52 +83,28 @@ Um ✨ ao lado de um limite significa que aquele número é estimado (veja abaix
 
 ## Os números são confiáveis?
 
-Depende da ferramenta, e o app deixa isso explícito em vez de fingir precisão.
+O app mostra número inventado em lugar nenhum. O que cada ferramenta permite medir é
+diferente, e a interface reflete isso.
 
 | | Codex | Claude Code |
 |---|---|---|
-| Limite de 5h | **exato** — vem do servidor | estimado ✨ |
-| Limite semanal | **exato** — vem do servidor | estimado ✨, precisa de calibração |
-| Tokens e custo | calculado dos logs | calculado dos logs |
+| Percentual do limite | **exato**, vindo do servidor | **não é exibido** |
+| Janela e horário de reset | exato | exato |
+| Tokens e custo | exato | exato |
 
-O Codex grava nos próprios logs um evento com o percentual real de uso e o horário do reset.
-É o mesmo número que o `/status` dele mostra.
+O Codex grava nos próprios registros o percentual real de uso das janelas de 5h e semanal.
+O TokenBar só lê.
 
-O Claude Code **não** grava isso: o percentual só aparece no log depois que a API recusa uma
-requisição por limite. Então o app converte seu consumo em custo e compara com um teto. Para
-esse número bater com a realidade, calibre uma vez (leva um minuto) — veja a seção seguinte.
+O Claude Code não grava isso: o percentual só aparece depois que a API recusa uma requisição
+por limite. Versões anteriores estimavam esse número convertendo consumo em custo e comparando
+com um teto calibrado. **Isso foi removido na 1.5.0**, porque não se sustenta: seis métricas
+diferentes foram testadas contra duas janelas medidas no app oficial e o teto implícito variou
+entre 2,1x e 2,7x de uma medição para a outra. Em uso real o app chegou a mostrar 114% quando
+o valor verdadeiro era 9%.
 
----
-
-## Calibrar o Claude (recomendado)
-
-Faça isso pela própria aba **Ajustes** do painel:
-
-1. Abra o app do Claude em **Configurações → Uso**.
-2. No TokenBar, vá em **Ajustes → Calibrar o Claude**, digite o percentual que o app está
-   mostrando e clique em **Calibrar**. O teto é calculado e gravado sozinho.
-
-Repita quando os dois números divergirem. **Não é "calibrar uma vez e esquecer"**: o teto muda
-quando a Anthropic concede bônus temporários, quando seu plano muda, e a própria conversão de
-consumo em percentual tem uma margem — medições ao longo de uma mesma sessão renderam tetos
-entre $43 e $53. Recalibrar leva cinco segundos.
-
-Quem preferir editar na mão, o arquivo é `~/.tokenbar/config.json`:
-
-```bash
-cp config.example.json ~/.tokenbar/config.json
-```
-
-```json
-{
-  "claudeSessionCostCeiling": 53.62,
-  "claudeWeeklyCostCeiling": 533.0,
-  "claudeWeeklyResetWeekday": 5,
-  "claudeWeeklyResetHour": 12
-}
-```
-
-O teto depende do seu plano (Pro, Max, Equipe), então cada pessoa precisa calibrar o seu.
+No lugar do percentual, os anéis do Claude mostram **o tempo da janela** — quanto falta para o
+reset da sessão de 5h e do ciclo semanal —, e os cartões mostram tokens e custo medidos. Para o
+percentual exato, o caminho continua sendo Configurações › Uso no app do Claude.
 
 ### Todas as opções de configuração
 
@@ -136,8 +112,6 @@ O teto depende do seu plano (Pro, Max, Equipe), então cada pessoa precisa calib
 |---|---|---|
 | `refreshSeconds` | intervalo de atualização | `20` |
 | `hoverDelaySeconds` | atraso até o painel abrir no hover | `0.25` |
-| `claudeSessionCostCeiling` | teto em USD da janela de 5h | calibra pelo seu pico |
-| `claudeWeeklyCostCeiling` | teto em USD do ciclo semanal | sem percentual |
 | `claudeWeeklyResetWeekday` | dia do reset semanal (1=domingo … 5=quinta) | `5` |
 | `claudeWeeklyResetHour` | hora do reset semanal | `12` |
 | `openaiPrices` | preços por milhão de tokens dos modelos OpenAI | tabela embutida |
@@ -226,7 +200,7 @@ quem recebe. Para distribuir sem nenhum atrito seria preciso Developer ID e nota
 ## Avisos de limite
 
 Nos **Ajustes**, o app avisa quando a janela de 5h passa de um limiar — 80% por padrão,
-ajustável entre 60% e 95%. Vale para as duas ferramentas.
+ajustável entre 60% e 95%. Vale para o Codex, que é quem informa o percentual real.
 
 Dispara **uma vez por janela e por ferramenta**: o aviso serve para você decidir o que fazer,
 não para repetir a cada atualização até o limite estourar. A janela já avisada fica registrada

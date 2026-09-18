@@ -121,20 +121,22 @@ enum ClaudeCollector {
 
         let timeline = cache.timeline(since: cutoff, pathPrefix: Paths.claudeProjects.path)
         snapshot.today = aggregate(timeline, since: Calendar.current.startOfDay(for: Date()))
-        let weekly = weeklyLimit(timeline: timeline)
         // "Semana" aqui é a janela do limite semanal, não 7 dias para trás.
-        snapshot.week = weekly.used
+        snapshot.week = weeklyUsage(timeline: timeline)
         snapshot.weekIsCycle = true
 
         let blocks = fiveHourBlocks(from: timeline)
-        let hits = cache.limitHits(since: cutoff, pathPrefix: Paths.claudeProjects.path)
         if let current = blocks.last, current.isActive {
             snapshot.currentBlock = current.aggregate
-            snapshot.sessionLimit = estimateSessionLimit(current: current, history: blocks, hits: hits)
-        } else {
-            snapshot.sessionLimit = LimitGauge(usedPercent: 0, resetsAt: nil, exact: false, label: "sem bloco ativo")
+            snapshot.sessionWindow = (current.start, current.end)
         }
-        snapshot.weeklyLimit = weekly.gauge
+        // Sem percentual: medir consumo contra um teto fixo não se sustentou. Seis
+        // métricas foram testadas contra duas janelas medidas no app oficial e o teto
+        // implícito variou de 2,1x a 2,7x entre elas — qualquer número aqui enganaria.
+        snapshot.sessionLimit = nil
+        snapshot.weeklyLimit = nil
+        snapshot.weeklyWindow = (weeklyWindowStart(), weeklyWindowStart().addingTimeInterval(7 * 86_400))
+
         snapshot.activeSession = activeSession(files: files)
         return snapshot
     }
@@ -166,35 +168,6 @@ enum ClaudeCollector {
         return blocks
     }
 
-    /// O Claude Code não grava o percentual do limite antes de você bater nele. Duas fontes de teto,
-    /// em ordem de confiança: um teto fixado no config, um bloco que realmente levou 429, ou o
-    /// maior bloco já observado.
-    private static func estimateSessionLimit(current: Block, history: [Block], hits: [Date]) -> LimitGauge {
-        let past = history.dropLast()
-        var ceiling = Config.shared.claudeSessionCostCeiling ?? 0
-        var label = ceiling > 0 ? "teto do config" : ""
-
-        if ceiling == 0 {
-            // Blocos que foram recusados por limite revelam o teto real.
-            let rejected = past.filter { block in
-                hits.contains { $0 >= block.start && $0 < block.end }
-            }.map(\.aggregate.cost)
-            if let proven = rejected.min(), proven > 0 {
-                ceiling = proven
-                label = "calibrado por limite atingido"
-            }
-        }
-        if ceiling == 0, let peak = past.map(\.aggregate.cost).max(), peak > 0 {
-            ceiling = peak
-            label = "estimado pelo pico"
-        }
-        guard ceiling > 0 else {
-            return LimitGauge(usedPercent: 0, resetsAt: current.end, exact: false, label: "sem histórico p/ calibrar")
-        }
-        return LimitGauge(usedPercent: min(current.aggregate.cost / ceiling * 100, 999),
-                          resetsAt: current.end, exact: false, label: label)
-    }
-
     /// O limite semanal reseta em dia e hora fixos da semana (no app: quinta, 12:00), não numa
     /// janela rolante de 7 dias. Somar 7 dias para trás inflava o consumo em ~2,7x.
     static func weeklyWindowStart(now: Date = Date()) -> Date {
@@ -218,17 +191,11 @@ enum ClaudeCollector {
         return previous
     }
 
-    private static func weeklyLimit(timeline: [(date: Date, model: String, usage: RawUsage)]) -> (gauge: LimitGauge?, used: Aggregate) {
+    private static func weeklyUsage(timeline: [(date: Date, model: String, usage: RawUsage)]) -> Aggregate {
         let start = weeklyWindowStart()
         var used = Aggregate()
         for row in timeline where row.date >= start { used.add(model: row.model, row.usage) }
-
-        let reset = start.addingTimeInterval(7 * 86_400)
-        guard let ceiling = Config.shared.claudeWeeklyCostCeiling, ceiling > 0 else {
-            return (nil, used)
-        }
-        return (LimitGauge(usedPercent: min(used.cost / ceiling * 100, 999),
-                           resetsAt: reset, exact: false, label: "teto do config"), used)
+        return used
     }
 
     /// Sessão viva = transcript tocado nos últimos 3 minutos.
@@ -338,50 +305,60 @@ enum CodexCollector {
         return snapshot
     }
 
-    /// Lê o fim dos rollouts recentes atrás do último estado de limites utilizável.
+    /// Lê o fim dos rollouts recentes atrás do estado de limites mais novo.
     ///
-    /// Não basta olhar o registro mais novo: ao atingir o limite, o Codex passa a gravar
-    /// `rate_limits` com todos os campos nulos. Parar no primeiro registro encontrado
-    /// apagaria os medidores justamente quando o limite foi atingido — que é quando eles
-    /// mais importam. Então procura para trás até achar um registro com valores.
+    /// Dois cuidados que o caminho ingênuo erra:
+    ///
+    /// 1. A data de modificação do arquivo não diz a idade do conteúdo. O Codex reabre
+    ///    sessões antigas, então um arquivo tocado hoje pode ter como último registro algo
+    ///    de duas semanas atrás. Por isso os candidatos são comparados pelo timestamp do
+    ///    próprio registro, não pela ordem dos arquivos.
+    /// 2. Ao atingir o limite, o Codex grava `rate_limits` com os campos nulos. Registros
+    ///    assim são ignorados, e a busca continua para trás.
     private static func applyLiveState(from files: [(path: String, mtime: Date)], to snapshot: inout ProviderSnapshot) {
-        var limitesDefinidos = false
-        var sessaoDefinida = false
+        var melhorLimite: (quando: Date, limits: [String: Any])?
+        var melhorUso: (quando: Date, info: [String: Any], arquivo: (path: String, mtime: Date))?
 
-        for arquivo in files.prefix(6) {
+        for arquivo in files.prefix(8) {
             guard let texto = tail(of: arquivo.path, bytes: 4 << 20) else { continue }
 
             for linha in texto.split(separator: "\n").reversed() {
                 guard linha.contains("\"token_count\""),
                       let root = JSON.object(String(linha)),
+                      let quando = JSON.date(root["timestamp"]),
                       let payload = root["payload"] as? [String: Any],
                       payload["type"] as? String == "token_count" else { continue }
 
-                if !sessaoDefinida, let info = payload["info"] as? [String: Any] {
-                    aplicarUso(info: info, arquivo: arquivo, to: &snapshot)
-                    sessaoDefinida = true
+                if let info = payload["info"] as? [String: Any],
+                   melhorUso == nil || quando > melhorUso!.quando {
+                    melhorUso = (quando, info, arquivo)
                 }
 
-                if !limitesDefinidos, let limits = payload["rate_limits"] as? [String: Any] {
-                    let primario = gauge(from: limits["primary"], fallbackLabel: "janela de 5h")
-                    // Um registro só serve se trouxer de fato o percentual da janela de 5h.
-                    if primario != nil {
-                        snapshot.plan = limits["plan_type"] as? String
-                        snapshot.sessionLimit = primario
-                        snapshot.weeklyLimit = gauge(from: limits["secondary"], fallbackLabel: "janela semanal")
-
-                        if let secundaria = limits["secondary"] as? [String: Any],
-                           let reset = (secundaria["resets_at"] as? NSNumber)?.doubleValue,
-                           case let minutos = JSON.int(secundaria, "window_minutes"), minutos > 0 {
-                            let inicio = Date(timeIntervalSince1970: reset - Double(minutos) * 60)
-                            if inicio <= Date() { snapshot.weeklyWindowStart = inicio }
-                        }
-                        limitesDefinidos = true
-                    }
+                if let limits = payload["rate_limits"] as? [String: Any],
+                   temPercentual(limits["primary"]) || temPercentual(limits["secondary"]),
+                   melhorLimite == nil || quando > melhorLimite!.quando {
+                    melhorLimite = (quando, limits)
                 }
 
-                if limitesDefinidos && sessaoDefinida { return }
+                // Dentro de um arquivo as linhas são cronológicas: o primeiro registro
+                // aproveitável vindo do fim já é o mais novo daquele arquivo.
+                break
             }
+        }
+
+        if let melhorUso { aplicarUso(info: melhorUso.info, arquivo: melhorUso.arquivo, to: &snapshot) }
+
+        guard let melhorLimite else { return }
+        let limits = melhorLimite.limits
+        snapshot.plan = limits["plan_type"] as? String
+        snapshot.sessionLimit = gauge(from: limits["primary"], fallbackLabel: "janela de 5h")
+        snapshot.weeklyLimit = gauge(from: limits["secondary"], fallbackLabel: "janela semanal")
+
+        if let secundaria = limits["secondary"] as? [String: Any],
+           let reset = (secundaria["resets_at"] as? NSNumber)?.doubleValue,
+           case let minutos = JSON.int(secundaria, "window_minutes"), minutos > 0 {
+            let inicio = Date(timeIntervalSince1970: reset - Double(minutos) * 60)
+            if inicio <= Date() { snapshot.weeklyWindowStart = inicio }
         }
     }
 
@@ -417,6 +394,12 @@ enum CodexCollector {
         }
     }
 
+    /// O servidor informou o percentual neste registro? Independe de a janela ter vencido.
+    private static func temPercentual(_ raw: Any?) -> Bool {
+        guard let dict = raw as? [String: Any] else { return false }
+        return (dict["used_percent"] as? NSNumber) != nil
+    }
+
     private static func gauge(from raw: Any?, fallbackLabel: String) -> LimitGauge? {
         guard let dict = raw as? [String: Any],
               let percent = (dict["used_percent"] as? NSNumber)?.doubleValue else { return nil }
@@ -428,7 +411,9 @@ enum CodexCollector {
         // desde o último registro, aquele número é de um período que não existe mais —
         // e como nenhuma requisição nova apareceu, o consumo da janela atual é zero.
         if let resets, resets <= Date() {
-            return LimitGauge(usedPercent: 0, resetsAt: nil, exact: false, label: "janela renovada")
+            // A janela virou, mas sem requisição nova o servidor não informou nada sobre
+            // a atual. Zero seria um palpite com cara de medida — melhor dizer que não sabe.
+            return nil
         }
 
         return LimitGauge(usedPercent: percent, resetsAt: resets, exact: true, label: label)

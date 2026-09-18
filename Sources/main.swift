@@ -78,26 +78,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let title = NSMutableAttributedString()
         let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
 
-        func append(_ symbol: String, _ provider: ProviderSnapshot) {
-            let gauge = provider.sessionLimit
-            let color: NSColor
-            switch gauge?.severity {
-            case .critical: color = NSColor.systemRed
-            case .warn: color = NSColor.systemOrange
-            case .ok: color = NSColor.labelColor
-            case nil: color = NSColor.tertiaryLabelColor
-            }
-            let text = gauge.map { String(format: "%.0f%%", $0.usedPercent) } ?? "–"
+        func rotulo(_ symbol: String, _ texto: String, _ cor: NSColor) {
             title.append(NSAttributedString(string: "\(symbol) ", attributes: [
                 .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
                 .foregroundColor: NSColor.secondaryLabelColor,
             ]))
-            title.append(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]))
+            title.append(NSAttributedString(string: texto, attributes: [.font: font, .foregroundColor: cor]))
         }
 
-        append("CC", snapshot.claude)
+        // Claude não expõe percentual de limite localmente, então aqui vai o custo do
+        // dia, que é medido sem erro. Codex mostra o percentual real do servidor.
+        rotulo("CC", Fmt.money(snapshot.claude.today.cost), NSColor.labelColor)
         title.append(NSAttributedString(string: "  "))
-        append("CX", snapshot.codex)
+
+        let codex = snapshot.codex.sessionLimit
+        let cor: NSColor
+        switch codex?.severity {
+        case .critical: cor = .systemRed
+        case .warn: cor = .systemOrange
+        case .ok: cor = .labelColor
+        case nil: cor = .tertiaryLabelColor
+        }
+        rotulo("CX", codex.map { String(format: "%.0f%%", $0.usedPercent) } ?? "–", cor)
         button.attributedTitle = title
         button.toolTip = tooltip(snapshot)
     }

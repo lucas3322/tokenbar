@@ -26,6 +26,8 @@ enum Fmt {
         guard remaining > 0 else { return "agora" }
         let hours = Int(remaining) / 3_600
         let minutes = (Int(remaining) % 3_600) / 60
+        // Acima de um dia, "141h13" não se lê. Vira "5d 21h".
+        if hours >= 24 { return "\(hours / 24)d \(hours % 24)h" }
         return hours > 0 ? "\(hours)h\(String(format: "%02d", minutes))" : "\(minutes)min"
     }
 

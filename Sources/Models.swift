@@ -107,6 +107,11 @@ struct ProviderSnapshot {
     /// Início da janela semanal informado pelo servidor, quando existe.
     var weeklyWindowStart: Date?
 
+    /// Janelas de tempo do Claude. Sem percentual confiável, o que sobra de exato é
+    /// quanto da janela já passou e quanto falta para o reset.
+    var sessionWindow: (start: Date, end: Date)?
+    var weeklyWindow: (start: Date, end: Date)?
+
     /// `true` quando o total semanal cobre a janela real do limite, e não 7 dias corridos.
     var weekIsCycle = false
     var weekLabel: String { weekIsCycle ? "ciclo" : "7 dias" }

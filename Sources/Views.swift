@@ -202,15 +202,22 @@ struct ProviderDetail: View {
                     .foregroundStyle(.secondary)
             }
 
-            Panel(title: "LIMITES") {
-                GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit, tint: provider.tint)
-                GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, tint: provider.tint,
-                         emptyHint: "defina claudeWeeklyCostCeiling no config")
-                if provider.sessionLimit?.exact == false {
-                    Text("Estimado (\(provider.sessionLimit?.label ?? "")): o Claude Code não expõe o limite localmente. Confira em Ajustes › Calibrar o Claude.")
+            if provider.sessionWindow != nil || provider.weeklyWindow != nil {
+                Panel(title: "JANELAS") {
+                    WindowRow(title: "Sessão 5h", janela: provider.sessionWindow, tint: provider.tint)
+                    WindowRow(title: "Ciclo semanal", janela: provider.weeklyWindow, tint: provider.tint)
+                    Text("O Claude Code não expõe o percentual do limite fora do app oficial — ele só aparece depois de uma recusa por limite. Em vez de estimar um número que erraria, aqui ficam o tempo da janela e o consumo medido.")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if provider.sessionLimit != nil || provider.weeklyLimit != nil {
+                Panel(title: "LIMITES") {
+                    GaugeRow(title: "Sessão 5h", gauge: provider.sessionLimit, tint: provider.tint)
+                    GaugeRow(title: "Semanal", gauge: provider.weeklyLimit, tint: provider.tint,
+                             emptyHint: "aguardando uso")
                 }
             }
 
@@ -483,5 +490,35 @@ struct TabBar: View {
         .padding(2)
         .background(Color.primary.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// Linha de janela de tempo: quanto já correu e quando reseta.
+struct WindowRow: View {
+    let title: String
+    let janela: (start: Date, end: Date)?
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(title).font(.system(size: 10.5)).foregroundStyle(.secondary)
+                Spacer()
+                if let janela {
+                    Text("reseta \(Fmt.clock(janela.end)) · faltam \(Fmt.countdown(to: janela.end) ?? "—")")
+                        .font(.system(size: 9.5, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                } else {
+                    Text("sem uso nesta janela").font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                }
+            }
+            if let janela {
+                let total = janela.end.timeIntervalSince(janela.start)
+                let corrido = Date().timeIntervalSince(janela.start)
+                Bar(percent: total > 0 ? min(max(corrido / total * 100, 0), 100) : 0, color: tint)
+            } else {
+                Capsule().fill(Color.primary.opacity(0.06)).frame(height: 5)
+            }
+        }
     }
 }

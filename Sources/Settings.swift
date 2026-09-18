@@ -128,6 +128,7 @@ final class SettingsStore: ObservableObject {
     /// Converte o percentual real (lido no app do Claude) no teto de custo correspondente,
     /// e grava no config. O teto muda quando a Anthropic mexe nos limites ou concede bônus,
     /// então isso precisa ser refeito de vez em quando — daqui leva cinco segundos.
+    @available(*, deprecated, message: "sem teto a calibrar")
     func calibrate(realPercent: Double, currentCost: Double, key: String, label: String) {
         guard realPercent > 0, currentCost > 0 else {
             calibrationResult = "Informe o percentual que o app do Claude está mostrando."
@@ -193,10 +194,6 @@ struct SettingsTab: View {
                 UpdateBox(updater: updater)
             }
 
-            Panel(title: "CALIBRAR O CLAUDE") {
-                CalibrationBox(store: store, snapshot: monitor.snapshot.claude)
-            }
-
             Panel(title: "CONFIGURAÇÃO") {
                 ActionRow(icon: "slider.horizontal.3",
                           title: "Abrir arquivo de configuração",
@@ -245,7 +242,7 @@ struct NotifyBox: View {
             Toggle(isOn: $notifier.ativo) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Avisar ao passar do limite").font(.system(size: 11.5))
-                    Text("um aviso por janela de 5h, de cada ferramenta")
+                    Text("vale para o Codex, que informa o percentual real do limite")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.tertiary)
                 }
@@ -348,69 +345,6 @@ struct UpdateBox: View {
         default:
             Button("Verificar") { Task { await updater.verificar() } }
                 .font(.system(size: 10.5)).controlSize(.small)
-        }
-    }
-}
-
-/// Converte o percentual mostrado pelo app do Claude no teto de custo do TokenBar.
-struct CalibrationBox: View {
-    @ObservedObject var store: SettingsStore
-    let snapshot: ProviderSnapshot
-
-    @State private var sessionPercent = ""
-    @State private var weeklyPercent = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Abra o app do Claude em Configurações › Uso e copie os percentuais para cá. O TokenBar calcula o teto sozinho.")
-                .font(.system(size: 9.5))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            field(title: "Sessão 5h",
-                  placeholder: "ex.: 42",
-                  text: $sessionPercent,
-                  current: snapshot.currentBlock.cost,
-                  key: "claudeSessionCostCeiling",
-                  label: "Sessão")
-
-            field(title: "Semanal",
-                  placeholder: "ex.: 16",
-                  text: $weeklyPercent,
-                  current: snapshot.week.cost,
-                  key: "claudeWeeklyCostCeiling",
-                  label: "Semanal")
-
-            if let result = store.calibrationResult {
-                Text(result)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Severity.ok.color)
-            }
-        }
-    }
-
-    private func field(title: String, placeholder: String, text: Binding<String>,
-                       current: Double, key: String, label: String) -> some View {
-        HStack(spacing: 7) {
-            Text(title)
-                .font(.system(size: 11))
-                .frame(width: 66, alignment: .leading)
-            TextField(placeholder, text: text)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 11, design: .monospaced))
-                .frame(width: 62)
-            Text("%").font(.system(size: 10)).foregroundStyle(.tertiary)
-            Text(Fmt.money(current))
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.tertiary)
-            Spacer()
-            Button("Calibrar") {
-                let value = Double(text.wrappedValue.replacingOccurrences(of: ",", with: ".")) ?? 0
-                store.calibrate(realPercent: value, currentCost: current, key: key, label: label)
-            }
-            .font(.system(size: 10.5))
-            .controlSize(.small)
-            .disabled(text.wrappedValue.isEmpty || current <= 0)
         }
     }
 }

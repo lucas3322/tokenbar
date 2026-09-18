@@ -1,6 +1,18 @@
 {
-  "atual": "1.5.0",
+  "atual": "1.5.1",
   "versoes": [
+    {
+      "versao": "1.5.1",
+      "data": "2026-09-18",
+      "arquivo": "download/TokenBar-1.5.1-AppleSilicon.zip",
+      "tamanhoKB": 1232,
+      "sha256": "3b6ed7d98e674e13af315171d7bb4bb367eabeefde907b2fb9a30f496bc50606",
+      "notas": [
+        "O percentual do Claude voltou. O teto deixou de ser um número fixo — que envelhecia e chegou a produzir 114% — e passou a se corrigir conforme o uso, sem nunca ultrapassar 100%.",
+        "Nos Ajustes, o campo “Acertar o Claude” fixa o teto a partir do percentual que o app oficial mostra."
+      ],
+      "titulo": "Percentual do Claude de volta, agora com teto que aprende"
+    },
     {
       "versao": "1.5.0",
       "data": "2026-09-18",

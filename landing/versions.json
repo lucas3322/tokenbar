@@ -1,6 +1,18 @@
 {
-  "atual": "1.4.3",
+  "atual": "1.5.0",
   "versoes": [
+    {
+      "versao": "1.5.0",
+      "data": "2026-09-18",
+      "arquivo": "download/TokenBar-1.5.0-AppleSilicon.zip",
+      "tamanhoKB": 1212,
+      "sha256": "5dfe9199dcd3552faf08a3e93b9ab91f414eff90b9e78692c03a3138fcac1e3b",
+      "notas": [
+        "O percentual estimado do Claude foi removido: ele chegou a mostrar 114% quando o uso real era 9%. No lugar, os anéis mostram o tempo que falta para o reset da janela, e a barra de menus passa a mostrar o custo do dia.",
+        "O percentual do Codex, que vem do servidor, continua exato — e foram corrigidos dois erros que faziam o app ler limites antigos ou perder o semanal."
+      ],
+      "titulo": "Só números que dá para provar"
+    },
     {
       "versao": "1.4.3",
       "data": "2026-09-16",

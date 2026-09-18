@@ -83,28 +83,31 @@ Um ✨ ao lado de um limite significa que aquele número é estimado (veja abaix
 
 ## Os números são confiáveis?
 
-O app mostra número inventado em lugar nenhum. O que cada ferramenta permite medir é
-diferente, e a interface reflete isso.
-
 | | Codex | Claude Code |
 |---|---|---|
-| Percentual do limite | **exato**, vindo do servidor | **não é exibido** |
+| Percentual do limite | **exato**, vindo do servidor | estimado ✨, com teto que se corrige |
 | Janela e horário de reset | exato | exato |
 | Tokens e custo | exato | exato |
 
-O Codex grava nos próprios registros o percentual real de uso das janelas de 5h e semanal.
-O TokenBar só lê.
+O Codex grava nos próprios registros o percentual real das janelas de 5h e semanal — o app
+só lê. O Claude Code não grava: esse número só aparece depois que a API recusa uma requisição
+por limite.
 
-O Claude Code não grava isso: o percentual só aparece depois que a API recusa uma requisição
-por limite. Versões anteriores estimavam esse número convertendo consumo em custo e comparando
-com um teto calibrado. **Isso foi removido na 1.5.0**, porque não se sustenta: seis métricas
-diferentes foram testadas contra duas janelas medidas no app oficial e o teto implícito variou
-entre 2,1x e 2,7x de uma medição para a outra. Em uso real o app chegou a mostrar 114% quando
-o valor verdadeiro era 9%.
+Para o Claude, o app converte o consumo em custo e compara com um teto. O que mudou na 1.5.1
+é que **esse teto não é mais um número fixo** — fixá-lo foi o que produziu "114% usado" quando
+o valor real era 9%. Agora ele se corrige com duas evidências tiradas dos próprios registros:
 
-No lugar do percentual, os anéis do Claude mostram **o tempo da janela** — quanto falta para o
-reset da sessão de 5h e do ciclo semanal —, e os cartões mostram tokens e custo medidos. Para o
-percentual exato, o caminho continua sendo Configurações › Uso no app do Claude.
+- **Passou sem ser recusado.** Se uma janela acumulou mais do que o teto e a API não recusou
+  nada, o limite era maior: o teto sobe.
+- **Foi recusado.** Um 429 por limite marca o ponto exato, e essa evidência pode baixar o teto.
+
+Na primeira execução o teto parte do maior consumo já observado no seu histórico, que é um
+piso conhecido do limite real. O percentual nunca passa de 100%.
+
+Se quiser acertar na hora, os **Ajustes** têm o campo *Acertar o Claude*: você informa o
+percentual que aparece em Configurações › Uso no app oficial e o teto é fixado por ele. O teto
+aprendido fica em `~/.tokenbar/teto.json`; para travá-lo à mão, use `claudeSessionCostCeiling`
+e `claudeWeeklyCostCeiling` no config.
 
 ### Todas as opções de configuração
 
@@ -114,6 +117,8 @@ percentual exato, o caminho continua sendo Configurações › Uso no app do Cla
 | `hoverDelaySeconds` | atraso até o painel abrir no hover | `0.25` |
 | `claudeWeeklyResetWeekday` | dia do reset semanal (1=domingo … 5=quinta) | `5` |
 | `claudeWeeklyResetHour` | hora do reset semanal | `12` |
+| `claudeSessionCostCeiling` | fixa o teto da janela de 5h, desligando o aprendizado | aprendido |
+| `claudeWeeklyCostCeiling` | fixa o teto do ciclo semanal | aprendido |
 | `openaiPrices` | preços por milhão de tokens dos modelos OpenAI | tabela embutida |
 
 O arquivo é lido a cada atualização — não precisa reiniciar o app.

@@ -194,6 +194,10 @@ struct SettingsTab: View {
                 UpdateBox(updater: updater)
             }
 
+            Panel(title: "ACERTAR O CLAUDE") {
+                AdjustBox(store: store, snapshot: monitor.snapshot.claude)
+            }
+
             Panel(title: "CONFIGURAÇÃO") {
                 ActionRow(icon: "slider.horizontal.3",
                           title: "Abrir arquivo de configuração",
@@ -345,6 +349,54 @@ struct UpdateBox: View {
         default:
             Button("Verificar") { Task { await updater.verificar() } }
                 .font(.system(size: 10.5)).controlSize(.small)
+        }
+    }
+}
+
+/// Corrige o teto aprendido com o percentual que o app oficial mostra.
+struct AdjustBox: View {
+    @ObservedObject var store: SettingsStore
+    let snapshot: ProviderSnapshot
+
+    @State private var sessao = ""
+    @State private var ciclo = ""
+    @State private var resultado: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("O app aprende o teto sozinho conforme você usa. Se quiser acertar na hora, abra Configurações › Uso no app do Claude e copie os percentuais.")
+                .font(.system(size: 9.5))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            campo("Sessão 5h", "ex.: 42", $sessao, snapshot.currentBlock.cost, true)
+            campo("Ciclo", "ex.: 80", $ciclo, snapshot.week.cost, false)
+
+            if let resultado {
+                Text(resultado).font(.system(size: 10)).foregroundStyle(Severity.ok.color)
+            }
+        }
+    }
+
+    private func campo(_ titulo: String, _ dica: String, _ texto: Binding<String>,
+                       _ custo: Double, _ paraSessao: Bool) -> some View {
+        HStack(spacing: 7) {
+            Text(titulo).font(.system(size: 11)).frame(width: 60, alignment: .leading)
+            TextField(dica, text: texto)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 11, design: .monospaced))
+                .frame(width: 58)
+            Text("%").font(.system(size: 10)).foregroundStyle(.tertiary)
+            Text(Fmt.money(custo)).font(.system(size: 10, design: .monospaced)).foregroundStyle(.tertiary)
+            Spacer()
+            Button("Acertar") {
+                let valor = Double(texto.wrappedValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+                var teto = Ceiling.carregar()
+                resultado = teto.acertar(percentualReal: valor, custoAtual: custo, paraSessao: paraSessao)
+            }
+            .font(.system(size: 10.5))
+            .controlSize(.small)
+            .disabled(texto.wrappedValue.isEmpty || custo <= 0)
         }
     }
 }

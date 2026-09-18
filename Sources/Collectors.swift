@@ -130,20 +130,53 @@ enum ClaudeCollector {
             snapshot.currentBlock = current.aggregate
             snapshot.sessionWindow = (current.start, current.end)
         }
-        // Sem percentual: medir consumo contra um teto fixo não se sustentou. Seis
-        // métricas foram testadas contra duas janelas medidas no app oficial e o teto
-        // implícito variou de 2,1x a 2,7x entre elas — qualquer número aqui enganaria.
-        snapshot.sessionLimit = nil
-        snapshot.weeklyLimit = nil
         snapshot.weeklyWindow = (weeklyWindowStart(), weeklyWindowStart().addingTimeInterval(7 * 86_400))
+
+        // Percentual contra um teto que se corrige sozinho — ver Ceiling.
+        var teto = Ceiling.carregar()
+        let recusas = cache.limitHits(since: cutoff, pathPrefix: Paths.claudeProjects.path)
+
+        // Primeira execução: parte do maior consumo já observado, que é um piso conhecido
+        // do limite real. Sem isso o teto nasceria igual ao consumo atual e o painel
+        // abriria em 100% para todo mundo.
+        if teto.sessao == 0, let pico = blocks.dropLast().map(\.aggregate.cost).max(), pico > 0 {
+            teto.sessao = pico * 1.02
+            teto.salvar()
+        }
+        if teto.semanal == 0 {
+            let cicloAnterior = aggregate(timeline,
+                                          since: weeklyWindowStart().addingTimeInterval(-7 * 86_400),
+                                          until: weeklyWindowStart())
+            teto.semanal = max(snapshot.week.cost, cicloAnterior.cost) * 1.02
+            teto.salvar()
+        }
+
+        if let janela = snapshot.sessionWindow {
+            let recusada = recusas.contains { $0 >= janela.start && $0 < janela.end }
+            teto.aprender(custo: snapshot.currentBlock.cost, recusado: recusada, paraSessao: true)
+            snapshot.sessionLimit = medidor(custo: snapshot.currentBlock.cost,
+                                            teto: teto.valor(paraSessao: true),
+                                            reset: janela.end,
+                                            exato: teto.sessaoExata)
+        }
+        if let janela = snapshot.weeklyWindow {
+            // As recusas registradas são do tipo "five_hour": não dizem nada sobre o
+            // limite semanal, e usá-las aqui fixaria o teto do ciclo no lugar errado.
+            teto.aprender(custo: snapshot.week.cost, recusado: false, paraSessao: false)
+            snapshot.weeklyLimit = medidor(custo: snapshot.week.cost,
+                                           teto: teto.valor(paraSessao: false),
+                                           reset: janela.end,
+                                           exato: teto.semanalExata)
+        }
 
         snapshot.activeSession = activeSession(files: files)
         return snapshot
     }
 
-    private static func aggregate(_ timeline: [(date: Date, model: String, usage: RawUsage)], since: Date) -> Aggregate {
+    private static func aggregate(_ timeline: [(date: Date, model: String, usage: RawUsage)],
+                                  since: Date, until: Date = .distantFuture) -> Aggregate {
         var out = Aggregate()
-        for row in timeline where row.date >= since { out.add(model: row.model, row.usage) }
+        for row in timeline where row.date >= since && row.date < until { out.add(model: row.model, row.usage) }
         return out
     }
 
@@ -189,6 +222,15 @@ enum ClaudeCollector {
             return now.addingTimeInterval(-7 * 86_400)
         }
         return previous
+    }
+
+    /// Monta o medidor, ou nada quando ainda não há teto para comparar.
+    private static func medidor(custo: Double, teto: Double, reset: Date, exato: Bool) -> LimitGauge? {
+        guard teto > 0 else { return nil }
+        return LimitGauge(usedPercent: min(custo / teto * 100, 100),
+                          resetsAt: reset,
+                          exact: false,
+                          label: exato ? "calibrado por limite atingido" : "teto aprendido")
     }
 
     private static func weeklyUsage(timeline: [(date: Date, model: String, usage: RawUsage)]) -> Aggregate {

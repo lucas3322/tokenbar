@@ -86,20 +86,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             title.append(NSAttributedString(string: texto, attributes: [.font: font, .foregroundColor: cor]))
         }
 
-        // Claude não expõe percentual de limite localmente, então aqui vai o custo do
-        // dia, que é medido sem erro. Codex mostra o percentual real do servidor.
-        rotulo("CC", Fmt.money(snapshot.claude.today.cost), NSColor.labelColor)
-        title.append(NSAttributedString(string: "  "))
-
-        let codex = snapshot.codex.sessionLimit
-        let cor: NSColor
-        switch codex?.severity {
-        case .critical: cor = .systemRed
-        case .warn: cor = .systemOrange
-        case .ok: cor = .labelColor
-        case nil: cor = .tertiaryLabelColor
+        func percentual(_ gauge: LimitGauge?) -> (String, NSColor) {
+            let cor: NSColor
+            switch gauge?.severity {
+            case .critical: cor = .systemRed
+            case .warn: cor = .systemOrange
+            case .ok: cor = .labelColor
+            case nil: cor = .tertiaryLabelColor
+            }
+            return (gauge.map { String(format: "%.0f%%", $0.usedPercent) } ?? "–", cor)
         }
-        rotulo("CX", codex.map { String(format: "%.0f%%", $0.usedPercent) } ?? "–", cor)
+
+        let claude = percentual(snapshot.claude.sessionLimit)
+        rotulo("CC", claude.0, claude.1)
+        title.append(NSAttributedString(string: "  "))
+        let codex = percentual(snapshot.codex.sessionLimit)
+        rotulo("CX", codex.0, codex.1)
         button.attributedTitle = title
         button.toolTip = tooltip(snapshot)
     }

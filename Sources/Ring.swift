@@ -64,8 +64,8 @@ struct RingRow: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            tempo(snapshot.claude.sessionWindow, "Claude", "janela 5h", Tint.claude)
-            tempo(snapshot.claude.weeklyWindow, "Claude", "ciclo", Tint.claude)
+            limite(snapshot.claude.sessionLimit, "Claude", "sessão 5h", Tint.claude)
+            limite(snapshot.claude.weeklyLimit, "Claude", "ciclo", Tint.claude)
             limite(snapshot.codex.sessionLimit, "Codex", "sessão 5h", Tint.codex)
             limite(snapshot.codex.weeklyLimit, "Codex", "semanal", Tint.codex)
         }

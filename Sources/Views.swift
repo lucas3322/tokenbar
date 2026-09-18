@@ -206,7 +206,7 @@ struct ProviderDetail: View {
                 Panel(title: "JANELAS") {
                     WindowRow(title: "Sessão 5h", janela: provider.sessionWindow, tint: provider.tint)
                     WindowRow(title: "Ciclo semanal", janela: provider.weeklyWindow, tint: provider.tint)
-                    Text("O Claude Code não expõe o percentual do limite fora do app oficial — ele só aparece depois de uma recusa por limite. Em vez de estimar um número que erraria, aqui ficam o tempo da janela e o consumo medido.")
+                    Text("O Claude Code não expõe o percentual do limite, então ele é calculado sobre um teto que o app aprende: passando do teto sem recusa, o teto sobe; uma recusa por limite marca o ponto exato.")
                         .font(.system(size: 9.5))
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)

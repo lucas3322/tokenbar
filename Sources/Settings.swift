@@ -361,6 +361,7 @@ struct AdjustBox: View {
     @State private var sessao = ""
     @State private var ciclo = ""
     @State private var resultado: String?
+    @State private var teto = Ceiling.carregar()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -374,6 +375,23 @@ struct AdjustBox: View {
 
             if let resultado {
                 Text(resultado).font(.system(size: 10)).foregroundStyle(Severity.ok.color)
+            }
+
+            if teto.sessaoManual || teto.semanalManual {
+                HStack(spacing: 6) {
+                    Image(systemName: "pin.fill").font(.system(size: 8)).foregroundStyle(.tertiary)
+                    Text("teto fixado por você — o app parou de aprender sozinho")
+                        .font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                    Spacer()
+                    Button("Voltar a aprender") {
+                        var t = Ceiling.carregar()
+                        t.soltar(paraSessao: true)
+                        t.soltar(paraSessao: false)
+                        teto = t
+                        resultado = "Voltou a aprender sozinho."
+                    }
+                    .font(.system(size: 10)).controlSize(.small)
+                }
             }
         }
     }
@@ -391,8 +409,9 @@ struct AdjustBox: View {
             Spacer()
             Button("Acertar") {
                 let valor = Double(texto.wrappedValue.replacingOccurrences(of: ",", with: ".")) ?? 0
-                var teto = Ceiling.carregar()
-                resultado = teto.acertar(percentualReal: valor, custoAtual: custo, paraSessao: paraSessao)
+                var t = Ceiling.carregar()
+                resultado = t.acertar(percentualReal: valor, custoAtual: custo, paraSessao: paraSessao)
+                teto = t
             }
             .font(.system(size: 10.5))
             .controlSize(.small)

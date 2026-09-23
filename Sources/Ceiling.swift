@@ -19,6 +19,11 @@ struct Ceiling: Codable {
     /// Marca que o valor veio de uma recusa real, não de inferência.
     var sessaoExata = false
     var semanalExata = false
+    /// Fixado à mão com o número do app oficial. O aprendizado automático não mexe
+    /// mais nesse teto — antes, uma janela antiga com 429 desfazia o ajuste na leitura
+    /// seguinte, e o valor que o usuário tinha acabado de informar sumia em 20 segundos.
+    var sessaoManual = false
+    var semanalManual = false
 
     static var url: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".tokenbar/teto.json")
@@ -45,13 +50,23 @@ struct Ceiling: Codable {
         return aprendido
     }
 
+    /// Volta a deixar o app aprender este teto sozinho.
+    mutating func soltar(paraSessao: Bool) {
+        if paraSessao { sessaoManual = false; sessaoExata = false } else { semanalManual = false; semanalExata = false }
+        salvar()
+    }
+
     /// Fixa o teto a partir do percentual real informado pelo usuário.
     mutating func acertar(percentualReal: Double, custoAtual: Double, paraSessao: Bool) -> String {
         guard percentualReal > 0, custoAtual > 0 else {
             return "Informe o percentual que o app do Claude mostra."
         }
         let novo = custoAtual / (percentualReal / 100)
-        if paraSessao { sessao = novo; sessaoExata = true } else { semanal = novo; semanalExata = true }
+        if paraSessao {
+            sessao = novo; sessaoExata = true; sessaoManual = true
+        } else {
+            semanal = novo; semanalExata = true; semanalManual = true
+        }
         salvar()
         return String(format: "Ajustado: teto de $%.2f", novo)
     }
@@ -59,6 +74,9 @@ struct Ceiling: Codable {
     /// Aprende com o consumo observado. `recusado` indica que houve 429 nesta janela.
     mutating func aprender(custo: Double, recusado: Bool, paraSessao: Bool) {
         guard custo > 0 else { return }
+        // Teto fixado à mão manda: o número veio do app oficial, nenhuma inferência
+        // nossa é melhor que isso.
+        if paraSessao ? sessaoManual : semanalManual { return }
         let exata = paraSessao ? sessaoExata : semanalExata
         let atual = paraSessao ? sessao : semanal
 

@@ -112,6 +112,9 @@ já foi visto" em vez de continuar subindo — foi assim que a 1.4 chegou a most
 O percentual da sessão de 5h se sustenta bem; o do ciclo semanal deriva mais, porque a relação
 entre custo e limite não se mantém ao longo de dias. Para os dois, o acerto manual resolve.
 
+Um teto fixado à mão **manda sobre o aprendizado**: o número veio do app oficial e nenhuma
+inferência é melhor que isso. O botão *Voltar a aprender* devolve o controle ao app.
+
 Se quiser acertar na hora, os **Ajustes** têm o campo *Acertar o Claude*: você informa o
 percentual que aparece em Configurações › Uso no app oficial e o teto é fixado por ele. O teto
 aprendido fica em `~/.tokenbar/teto.json`; para travá-lo à mão, use `claudeSessionCostCeiling`

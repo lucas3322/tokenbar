@@ -69,10 +69,11 @@ struct Ceiling: Codable {
             // Evidência forte: este foi o ponto em que a API disse não.
             novo = custo
             novoExata = true
-        } else if custo > atual, !exata || custo > atual * 1.05 {
-            // Passou do teto sem recusa: o limite é pelo menos isto. Uma folga pequena
-            // evita o painel ficar colado em 100% durante toda a janela.
-            novo = custo * 1.02
+        } else if custo > atual {
+            // Passou do teto sem recusa: o limite é pelo menos isto. Sem folga inventada —
+            // o teto vira o piso conhecido, e a janela em curso que o ultrapassa aparece
+            // como "acima do teto", não como um percentual falsamente preciso.
+            novo = custo
             novoExata = false
         }
 

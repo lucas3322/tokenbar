@@ -101,8 +101,16 @@ o valor real era 9%. Agora ele se corrige com duas evidências tiradas dos próp
   nada, o limite era maior: o teto sobe.
 - **Foi recusado.** Um 429 por limite marca o ponto exato, e essa evidência pode baixar o teto.
 
-Na primeira execução o teto parte do maior consumo já observado no seu histórico, que é um
-piso conhecido do limite real. O percentual nunca passa de 100%.
+O teto aprende apenas com **janelas encerradas**. Deixá-lo aprender durante a janela em curso
+o faria perseguir o consumo: o anel ficaria colado em ~98% o tempo todo e a escala mudaria a
+cada leitura — foi esse o comportamento de "valores bugando" das versões 1.5.0 e 1.5.1.
+
+A janela em curso serve só como piso: se ela já gastou X sem recusa, o limite é no mínimo X.
+Quando o consumo alcança o maior valor já visto, o anel para em 100% e diz "no limite do que
+já foi visto" em vez de continuar subindo — foi assim que a 1.4 chegou a mostrar 114%.
+
+O percentual da sessão de 5h se sustenta bem; o do ciclo semanal deriva mais, porque a relação
+entre custo e limite não se mantém ao longo de dias. Para os dois, o acerto manual resolve.
 
 Se quiser acertar na hora, os **Ajustes** têm o campo *Acertar o Claude*: você informa o
 percentual que aparece em Configurações › Uso no app oficial e o teto é fixado por ele. O teto

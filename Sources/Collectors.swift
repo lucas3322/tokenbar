@@ -144,25 +144,41 @@ enum ClaudeCollector {
             teto.salvar()
         }
         if teto.semanal == 0 {
-            let cicloAnterior = aggregate(timeline,
-                                          since: weeklyWindowStart().addingTimeInterval(-7 * 86_400),
-                                          until: weeklyWindowStart())
-            teto.semanal = max(snapshot.week.cost, cicloAnterior.cost) * 1.02
-            teto.salvar()
+            // Semente: o ciclo anterior, já fechado. Usar o ciclo em curso colocaria o
+            // teto no consumo de agora e abriria o painel em 100%.
+            let anterior = aggregate(timeline,
+                                     since: weeklyWindowStart().addingTimeInterval(-7 * 86_400),
+                                     until: weeklyWindowStart())
+            if anterior.cost > 0 { teto.semanal = anterior.cost * 1.02; teto.salvar() }
         }
 
+        // O teto aprende apenas com janelas ENCERRADAS. Aprender durante a janela em
+        // curso faria o teto perseguir o consumo: o anel ficaria grudado em ~98% o
+        // tempo todo e a escala mudaria a cada leitura.
+        func houveRecusa(_ de: Date, _ ate: Date) -> Bool {
+            recusas.contains { $0 >= de && $0 < ate }
+        }
+        for bloco in blocks {
+            // Janelas encerradas ensinam o teto normalmente. A janela em curso só serve
+            // como piso: se ela já gastou X sem recusa, o limite é no mínimo X.
+            teto.aprender(custo: bloco.aggregate.cost,
+                          recusado: !bloco.isActive && houveRecusa(bloco.start, bloco.end),
+                          paraSessao: true)
+        }
+        let inicioCiclo = weeklyWindowStart()
+        let cicloAnterior = aggregate(timeline,
+                                      since: inicioCiclo.addingTimeInterval(-7 * 86_400),
+                                      until: inicioCiclo)
+        teto.aprender(custo: cicloAnterior.cost, recusado: false, paraSessao: false)
+        teto.aprender(custo: snapshot.week.cost, recusado: false, paraSessao: false)
+
         if let janela = snapshot.sessionWindow {
-            let recusada = recusas.contains { $0 >= janela.start && $0 < janela.end }
-            teto.aprender(custo: snapshot.currentBlock.cost, recusado: recusada, paraSessao: true)
             snapshot.sessionLimit = medidor(custo: snapshot.currentBlock.cost,
                                             teto: teto.valor(paraSessao: true),
                                             reset: janela.end,
                                             exato: teto.sessaoExata)
         }
         if let janela = snapshot.weeklyWindow {
-            // As recusas registradas são do tipo "five_hour": não dizem nada sobre o
-            // limite semanal, e usá-las aqui fixaria o teto do ciclo no lugar errado.
-            teto.aprender(custo: snapshot.week.cost, recusado: false, paraSessao: false)
             snapshot.weeklyLimit = medidor(custo: snapshot.week.cost,
                                            teto: teto.valor(paraSessao: false),
                                            reset: janela.end,
@@ -225,12 +241,18 @@ enum ClaudeCollector {
     }
 
     /// Monta o medidor, ou nada quando ainda não há teto para comparar.
+    ///
+    /// Quando o consumo alcança o teto conhecido, o percentual para em 100% e o rótulo
+    /// diz por quê: o app nunca viu uma janela maior, então não tem escala para além
+    /// disso. Continuar subindo daria um número inventado — foi assim que apareceu 114%.
     private static func medidor(custo: Double, teto: Double, reset: Date, exato: Bool) -> LimitGauge? {
         guard teto > 0 else { return nil }
-        return LimitGauge(usedPercent: min(custo / teto * 100, 100),
-                          resetsAt: reset,
-                          exact: false,
-                          label: exato ? "calibrado por limite atingido" : "teto aprendido")
+        let percentual = min(custo / teto * 100, 100)
+        let rotulo: String
+        if custo >= teto { rotulo = "no limite do que já foi visto — acerte nos Ajustes" }
+        else if exato { rotulo = "calibrado pelo número oficial" }
+        else { rotulo = "teto aprendido" }
+        return LimitGauge(usedPercent: percentual, resetsAt: reset, exact: false, label: rotulo)
     }
 
     private static func weeklyUsage(timeline: [(date: Date, model: String, usage: RawUsage)]) -> Aggregate {

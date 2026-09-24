@@ -90,7 +90,9 @@ Um ✨ ao lado de um limite significa que aquele número é estimado (veja abaix
 | Tokens e custo | exato | exato |
 
 O Codex grava nos próprios registros o percentual real das janelas de 5h e semanal — o app
-só lê. O Claude Code não grava: esse número só aparece depois que a API recusa uma requisição
+só lê. Um detalhe do formato dele importa: **ao atingir o limite, o Codex passa a gravar esses
+campos nulos**. A leitura anda para trás até encontrar o último registro com valores, em vez de
+parar no mais recente e exibir um número antigo. O Claude Code não grava: esse número só aparece depois que a API recusa uma requisição
 por limite.
 
 Para o Claude, o app converte o consumo em custo e compara com um teto. O que mudou na 1.5.1

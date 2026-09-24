@@ -386,6 +386,9 @@ enum CodexCollector {
         for arquivo in files.prefix(8) {
             guard let texto = tail(of: arquivo.path, bytes: 4 << 20) else { continue }
 
+            // Limite de linhas examinadas por arquivo: a varredura anda para trás até
+            // achar um registro completo, mas não pode percorrer o rollout inteiro.
+            var examinados = 0
             for linha in texto.split(separator: "\n").reversed() {
                 guard linha.contains("\"token_count\""),
                       let root = JSON.object(String(linha)),
@@ -404,9 +407,13 @@ enum CodexCollector {
                     melhorLimite = (quando, limits)
                 }
 
-                // Dentro de um arquivo as linhas são cronológicas: o primeiro registro
-                // aproveitável vindo do fim já é o mais novo daquele arquivo.
-                break
+                // Só para quando o registro examinado serve para as duas coisas. Parar no
+                // primeiro `token_count` do fim descartava o arquivo inteiro quando esse
+                // registro vinha com os campos nulos — o que é justamente o que o Codex
+                // grava ao atingir o limite. O resultado era exibir um valor antigo.
+                if melhorLimite != nil && melhorUso != nil { break }
+                examinados += 1
+                if examinados >= 40 { break }
             }
         }
 

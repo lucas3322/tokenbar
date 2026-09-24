@@ -1,6 +1,17 @@
 {
-  "atual": "1.5.3",
+  "atual": "1.5.4",
   "versoes": [
+    {
+      "versao": "1.5.4",
+      "data": "2026-09-24",
+      "arquivo": "download/TokenBar-1.5.4-AppleSilicon.zip",
+      "tamanhoKB": 1236,
+      "sha256": "f8acc2c3d449884402e8fdb3ab55290654884b49efe78bd58ce0bde9aeac1438",
+      "notas": [
+        "Com o limite de 5h do Codex estourado, o painel mostrava a última medição antiga (65% em vez de 100%). Ao atingir o limite o Codex grava os campos vazios, e a leitura desistia do arquivo ali; agora ela procura o último registro com valores."
+      ],
+      "titulo": "Codex correto ao atingir o limite"
+    },
     {
       "versao": "1.5.3",
       "data": "2026-09-23",

@@ -1,6 +1,18 @@
 {
-  "atual": "1.5.4",
+  "atual": "1.5.5",
   "versoes": [
+    {
+      "versao": "1.5.5",
+      "data": "2026-09-29",
+      "arquivo": "download/TokenBar-1.5.5-AppleSilicon.zip",
+      "tamanhoKB": 1228,
+      "sha256": "11351c8e0413846d019237abb8267d76b0e92121ae57a49dd637007178cec172",
+      "notas": [
+        "O Opus 5.5 não estava na tabela e era cobrado como Opus 5, inflando o custo desse modelo em 82% — a leitura de cache dele custa menos da metade.",
+        "Modelos Claude novos passam a cair no tier correspondente em vez de sumir do total com custo zero."
+      ],
+      "titulo": "Preço do Opus 5.5"
+    },
     {
       "versao": "1.5.4",
       "data": "2026-09-24",

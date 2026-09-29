@@ -1,6 +1,17 @@
 {
-  "atual": "1.5.5",
+  "atual": "1.5.6",
   "versoes": [
+    {
+      "versao": "1.5.6",
+      "data": "2026-09-29",
+      "arquivo": "download/TokenBar-1.5.6-AppleSilicon.zip",
+      "tamanhoKB": 1228,
+      "sha256": "e895292f08e158a21fb8760eb772b0b396593872ac87eaca6b7e7346dadd0af5",
+      "notas": [
+        "Levar um 429 é a própria API dizendo que o limite acabou. Agora isso corrige o teto na hora, inclusive durante a janela em curso e por cima de um ajuste manual antigo."
+      ],
+      "titulo": "Recusa por limite corrige o teto sozinha"
+    },
     {
       "versao": "1.5.5",
       "data": "2026-09-29",

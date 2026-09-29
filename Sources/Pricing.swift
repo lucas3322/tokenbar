@@ -30,6 +30,9 @@ enum Pricing {
         "claude-mythos-5-1": .anthropic(input: 10, output: 50, cacheRead: 0.25),
         "claude-fable-5":    .anthropic(input: 10, output: 50),
         "claude-mythos-5":   .anthropic(input: 10, output: 50),
+        // Opus 5.5 é mais barato que o Opus 5 e tem leitura de cache fora do
+        // multiplicador padrão: $0.20, e não os $0.40 que 0,1x daria.
+        "claude-opus-5-5":   .anthropic(input: 4,  output: 20, cacheRead: 0.20),
         "claude-opus-5":     .anthropic(input: 5,  output: 25),
         "claude-opus-4-8":   .anthropic(input: 5,  output: 25),
         "claude-opus-4-7":   .anthropic(input: 5,  output: 25),
@@ -49,13 +52,15 @@ enum Pricing {
 
     static var openaiOverrides: [String: Rate] = [:]
 
-    /// O modo rápido do Opus 5/4.8 é cobrado como tier premium.
+    /// O modo rápido é cobrado como tier premium, e o valor difere por modelo.
     static let fastModeRate = Rate.anthropic(input: 10, output: 50)
+    static let fastModeRate55 = Rate.anthropic(input: 8, output: 40)
 
     static func rate(for model: String) -> Rate? {
         let key = normalize(model)
         if key.hasSuffix("|fast") {
             let base = String(key.dropLast(5))
+            if base.hasPrefix("claude-opus-5-5") { return fastModeRate55 }
             if base.hasPrefix("claude-opus-5") || base.hasPrefix("claude-opus-4-8") { return fastModeRate }
             return lookup(base)
         }
@@ -73,6 +78,13 @@ enum Pricing {
             }
         }
         if let best { return best.1 }
+        // Modelo Claude novo, ainda fora da tabela: cai no tier correspondente em vez de
+        // virar custo zero. Preço zerado some do total sem avisar ninguém — foi assim que
+        // o Opus 5.5 passou despercebido até alguém comparar os números.
+        if key.hasPrefix("claude-opus") { return anthropic["claude-opus-5"] }
+        if key.hasPrefix("claude-sonnet") { return anthropic["claude-sonnet-5"] }
+        if key.hasPrefix("claude-haiku") { return anthropic["claude-haiku-4-5"] }
+        if key.hasPrefix("claude-fable") || key.hasPrefix("claude-mythos") { return anthropic["claude-fable-5"] }
         // Modelos OpenAI que ainda não estão na tabela (ex.: modelos internos de review)
         // são precificados pelo tier principal, para o custo total não sumir silenciosamente.
         if key.hasPrefix("gpt-") || key.hasPrefix("codex-") || key.hasPrefix("o3") || key.hasPrefix("o4") {

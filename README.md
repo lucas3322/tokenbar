@@ -163,7 +163,7 @@ incremental a partir do último byte já visto, e o resultado fica resumido em b
 minutos no cache. A primeira execução leva cerca de 45 segundos varrendo os últimos 9 dias;
 as atualizações seguintes levam **cerca de 0,2 segundo**.
 
-Os preços da Anthropic estão embutidos no app, com os multiplicadores padrão de cache
+A tabela de preços da Anthropic está embutida no app, com os multiplicadores padrão de cache
 (leitura 0,1x, escrita 1,25x em 5min e 2x em 1h). Os preços da OpenAI ficam no config porque
 mudam com frequência. Modelos fora da tabela são cobrados pelo tier principal, para o custo
 total não sumir sem aviso.
@@ -253,6 +253,19 @@ sobrescrever enquanto roda.
 | `updateRepo` | repositório consultado | `lucas3322/tokenbar` |
 | `autoCheckUpdates` | verificar sozinho | `true` |
 | `updateCheckHours` | intervalo entre verificações | `6` |
+
+## Preços
+
+A tabela da Anthropic fica em `Sources/Pricing.swift`, com os multiplicadores padrão de cache
+(leitura 0,1x e escrita 1,25x em 5min / 2x em 1h) — **exceto onde o modelo foge do padrão**,
+como o Opus 5.5, cuja leitura de cache custa $0,20 e não os $0,40 que a regra daria.
+
+Um modelo Claude fora da tabela cai no tier correspondente (opus, sonnet, haiku, fable) em vez
+de virar custo zero. Preço zerado desaparece do total sem avisar: foi assim que o Opus 5.5
+passou semanas sendo cobrado como Opus 5, inflando o custo em 82% naquele modelo.
+
+Ao corrigir um preço, os tetos aprendidos precisam ser reescalados pelo mesmo fator — o consumo
+não mudou, só a conversão em dólares, e sem isso o percentual cairia sozinho.
 
 ## Versionamento
 

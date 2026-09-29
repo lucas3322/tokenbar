@@ -74,9 +74,10 @@ struct Ceiling: Codable {
     /// Aprende com o consumo observado. `recusado` indica que houve 429 nesta janela.
     mutating func aprender(custo: Double, recusado: Bool, paraSessao: Bool) {
         guard custo > 0 else { return }
-        // Teto fixado à mão manda: o número veio do app oficial, nenhuma inferência
-        // nossa é melhor que isso.
-        if paraSessao ? sessaoManual : semanalManual { return }
+        // Teto fixado à mão manda sobre inferência — mas não sobre uma recusa real.
+        // Um 429 é a própria API dizendo "acabou": é prova, e prova vence palpite,
+        // inclusive o do usuário, que pode ter sido informado dias atrás.
+        if !recusado, paraSessao ? sessaoManual : semanalManual { return }
         let exata = paraSessao ? sessaoExata : semanalExata
         let atual = paraSessao ? sessao : semanal
 

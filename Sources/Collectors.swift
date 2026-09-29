@@ -161,8 +161,12 @@ enum ClaudeCollector {
         for bloco in blocks {
             // Janelas encerradas ensinam o teto normalmente. A janela em curso só serve
             // como piso: se ela já gastou X sem recusa, o limite é no mínimo X.
+            //
+            // A recusa vale também na janela em curso: levar 429 agora é a evidência mais
+            // forte que existe de onde está o teto, e esperar a janela fechar deixaria o
+            // painel mostrando folga que não existe mais.
             teto.aprender(custo: bloco.aggregate.cost,
-                          recusado: !bloco.isActive && houveRecusa(bloco.start, bloco.end),
+                          recusado: houveRecusa(bloco.start, bloco.end),
                           paraSessao: true)
         }
         let inicioCiclo = weeklyWindowStart()

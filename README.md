@@ -114,8 +114,11 @@ já foi visto" em vez de continuar subindo — foi assim que a 1.4 chegou a most
 O percentual da sessão de 5h se sustenta bem; o do ciclo semanal deriva mais, porque a relação
 entre custo e limite não se mantém ao longo de dias. Para os dois, o acerto manual resolve.
 
-Um teto fixado à mão **manda sobre o aprendizado**: o número veio do app oficial e nenhuma
-inferência é melhor que isso. O botão *Voltar a aprender* devolve o controle ao app.
+A ordem de confiança é: **recusa real > ajuste manual > inferência**. Um 429 é a própria API
+dizendo que acabou, então ele corrige o teto mesmo por cima de um ajuste manual — inclusive
+durante a janela em curso, porque esperar ela fechar deixaria o painel mostrando folga que já
+não existe. Fora isso, o valor que você informou manda sobre qualquer inferência, e o botão
+*Voltar a aprender* devolve o controle ao app.
 
 Se quiser acertar na hora, os **Ajustes** têm o campo *Acertar o Claude*: você informa o
 percentual que aparece em Configurações › Uso no app oficial e o teto é fixado por ele. O teto

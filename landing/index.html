@@ -2,512 +2,961 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TokenBar — quanto você já gastou do Claude e do Codex, na barra do Mac</title>
 <meta name="description" content="App de barra de menus do macOS que mostra o consumo de tokens, os limites de sessão e o custo do Claude Code e do Codex. Gratuito, sem conta e sem rede.">
 
 <meta property="og:title" content="TokenBar">
 <meta property="og:description" content="Quanto você já gastou do Claude e do Codex, sem sair do que está fazendo.">
 <meta property="og:type" content="website">
-<meta name="theme-color" content="#0B0D10">
+<meta name="theme-color" content="#060709">
+<meta name="color-scheme" content="dark">
 
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<!-- Antes de qualquer pintura: sem JS, nada fica escondido à espera de animar. -->
+<script>document.documentElement.classList.add('js')</script>
 
 <style>
 /* ═══════════════════════════════════════════════════════════════════
    TOKENBAR — página de apresentação
 
-   Direção: painel de instrumentos. O produto é um mostrador; a página
-   se comporta como um. Anéis, marcações de escala, algarismos em mono
-   alinhados, nada de ilustração decorativa. Duas cores de leitura —
-   verde para o Claude, azul para o Codex —, o resto é metal e vidro.
+   Direção: o produto é um instrumento de vidro sobre a mesa do Mac.
+   A página mostra o instrumento funcionando — a barra de menus, o
+   painel descendo, os números andando — em vez de descrevê-lo.
 
-   O centro da página é o próprio painel, redesenhado em HTML. Não é
-   captura de tela: é o instrumento em tamanho real.
+   Desempenho: zero dependência externa. Fonte do sistema (SF Pro no
+   Mac, já com tamanho óptico e tracking ajustados), só transform e
+   opacity animando, e nada se mexe fora da tela.
+
+   Movimento: uma única curva de mola criticamente amortecida
+   (response 0,4 s, sem overshoot) em tudo. CSS transitions partem do
+   valor atual quando interrompidas, então abrir e fechar o painel no
+   meio do caminho nunca dá salto.
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
-  --void:     #08090B;
-  --ink:      #0B0D10;
-  --ink-2:    #101317;
-  --ink-3:    #161A20;
-  --steel:    #1D222A;
+  --void:   #040506;
+  --ink:    #060709;
+  --ink-2:  #0C0E12;
+  --ink-3:  #12151A;
 
-  --claude:   #4ECD8C;
-  --claude-lo:#2DA76B;
-  --codex:    #6E9BFF;
-  --codex-lo: #4A72D8;
-  --warn:     #F5B93C;
+  --claude: #4ECD8C;
+  --codex:  #6E9BFF;
+  --warn:   #FF9F0A;
+  --alert:  #FF453A;
 
-  --text:     #E9ECF1;
-  --dim:      #99A2AE;
-  --faint:    #5E6773;
+  --text:   #F2F4F7;
+  --dim:    #A1A8B3;
+  --faint:  #646C78;
 
-  --rule:     rgba(255,255,255,.075);
-  --rule-2:   rgba(255,255,255,.04);
+  --rule:   rgba(255,255,255,.08);
+  --rule-2: rgba(255,255,255,.045);
+  --glass:  rgba(30,32,38,.58);
+  --glass-edge: rgba(255,255,255,.14);
 
-  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono: 'IBM Plex Mono', 'SF Mono', Menlo, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
-  --gutter: clamp(20px, 5vw, 80px);
-  --measure: 1180px;
+  --gutter: clamp(16px, 5vw, 64px);
+  --measure: 1160px;
+
+  /* Mola criticamente amortecida, response 0,4 s. Gerada a partir de
+     x(t) = 1 − (1 + ωt)·e^(−ωt), com ω = 2π / 0,4. */
+  --spring: linear(0, .125, .345, .547, .701, .809, .881, .927, .956, .973, .984, .991, .995, .997, .998, .999, 1);
+  --spring-dur: .7s;
+}
+@supports not (transition-timing-function: linear(0, 1)) {
+  :root { --spring: cubic-bezier(.2, .9, .25, 1); }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; scroll-padding-top: 72px; }
 
 body {
   margin: 0;
   background: var(--ink);
   color: var(--text);
-  font-family: var(--sans);
-  font-size: 16px;
-  line-height: 1.62;
+  font: 17px/1.55 var(--sans);
+  letter-spacing: -.011em;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
   overflow-x: clip;
-}
-
-/* Malha de escala ao fundo, como a gravação de um mostrador. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--rule-2) 1px, transparent 1px),
-    linear-gradient(90deg, var(--rule-2) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
-  pointer-events: none;
-  z-index: 0;
 }
 
 a { color: inherit; }
 img, svg { max-width: 100%; }
+button { font: inherit; color: inherit; }
+::selection { background: color-mix(in oklab, var(--claude) 40%, transparent); }
 
-.wrap { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter); position: relative; z-index: 1; }
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter); position: relative; }
+
+/* ── Tipografia: tracking por tamanho, nunca um valor só ───────── */
+h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; }
+h1 {
+  font-size: clamp(44px, 8.4vw, 96px);
+  line-height: 1.02;
+  letter-spacing: -.045em;
+}
+h2 {
+  font-size: clamp(34px, 5.2vw, 60px);
+  line-height: 1.06;
+  letter-spacing: -.035em;
+}
+h3 { font-size: 21px; line-height: 1.24; letter-spacing: -.022em; }
+p { margin: 0; text-wrap: pretty; }
+h1, h2, h3, .lede { text-wrap: balance; }
 
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--faint);
-  margin: 0 0 20px;
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
+  margin: 0 0 14px;
+  background: linear-gradient(90deg, var(--claude), var(--codex));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  width: fit-content;
 }
+.lede { font-size: clamp(19px, 2.1vw, 23px); line-height: 1.45; color: var(--dim); letter-spacing: -.018em; max-width: 40ch; }
+.lede strong { color: var(--text); font-weight: 600; }
+.muted { color: var(--faint); }
 
-h1, h2, h3 { letter-spacing: -.022em; margin: 0; }
-h1 { font-size: clamp(38px, 6.2vw, 68px); font-weight: 600; line-height: 1.26; }
-h2 { font-size: clamp(26px, 3.4vw, 38px); font-weight: 600; line-height: 1.22; }
-h3 { line-height: 1.35; }
-h3 { font-size: 17px; font-weight: 600; letter-spacing: -.012em; line-height: 1.35; }
+/* ── Revelação ao rolar ─────────────────────────────────────────
+   Só existe com JS; sem ele a página já nasce inteira. */
+.js .reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .8s ease, transform 1s var(--spring);
+  transition-delay: var(--d, 0s);
+}
+.js .reveal.in { opacity: 1; transform: none; }
 
-p { margin: 0; }
-.lede { font-size: clamp(17px, 2vw, 20px); color: var(--dim); max-width: 62ch; }
-
-/* ── Cabeçalho ─────────────────────────────────────────────────── */
+/* ── Cabeçalho: material translúcido, borda só ao rolar ────────── */
 header {
   position: sticky; top: 0; z-index: 50;
-  backdrop-filter: saturate(160%) blur(14px);
-  background: color-mix(in oklab, var(--ink) 82%, transparent);
-  border-bottom: 1px solid var(--rule);
+  background: rgba(6,7,9,.66);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid transparent;
+  transition: border-color .3s ease, background .3s ease;
 }
-.bar { display: flex; align-items: center; gap: 14px; height: 62px; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -.02em; }
-.brand img { width: 26px; height: 26px; }
-.nav { margin-left: auto; display: flex; gap: 26px; font-size: 14px; color: var(--dim); }
-.nav a { text-decoration: none; transition: color .15s; }
+header.scrolled { border-bottom-color: var(--rule); }
+.bar { display: flex; align-items: center; gap: 14px; height: 54px; }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 16px; letter-spacing: -.02em; text-decoration: none; }
+.brand img { width: 24px; height: 24px; }
+.nav { margin-left: auto; display: flex; gap: 26px; font-size: 13px; color: var(--dim); }
+.nav a { text-decoration: none; transition: color .2s; }
 .nav a:hover { color: var(--text); }
-@media (max-width: 720px) { .nav { display: none; } }
+.bar .btn-sm { margin-left: 8px; }
+@media (max-width: 820px) { .nav { display: none; } .bar .btn-sm { margin-left: auto; } }
 
-/* ── Botões ────────────────────────────────────────────────────── */
+/* ── Botões: resposta no toque, não na soltura ──────────────────── */
 .btn {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 13px 22px;
-  border-radius: 10px;
-  font-size: 15px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 48px; padding: 0 24px;
+  border-radius: 999px;
+  font-size: 17px; font-weight: 500; letter-spacing: -.015em;
   text-decoration: none;
-  border: 1px solid transparent;
-  transition: transform .12s ease, background .15s, border-color .15s;
+  border: 0; cursor: pointer;
+  transition: transform .25s var(--spring), background-color .2s ease, box-shadow .3s ease;
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation;
 }
-.btn:active { transform: translateY(1px); }
-.btn-main { background: var(--text); color: var(--ink); }
-.btn-main:hover { background: #fff; }
-.btn-ghost { border-color: var(--rule); color: var(--dim); }
-.btn-ghost:hover { border-color: rgba(255,255,255,.2); color: var(--text); }
-.btn small { font-family: var(--mono); font-size: 11.5px; opacity: .6; font-weight: 400; }
+.btn:active { transform: scale(.96); transition-duration: .08s; }
+.btn:focus-visible, .copy:focus-visible, .more:focus-visible, .mb-item:focus-visible { outline: 2px solid var(--codex); outline-offset: 3px; }
+.btn-main { background: var(--text); color: #000; }
+.btn-main:hover { background: #fff; box-shadow: 0 0 0 6px rgba(255,255,255,.08); }
+.btn-ghost { background: rgba(255,255,255,.08); color: var(--text); }
+.btn-ghost:hover { background: rgba(255,255,255,.13); }
+.btn-link { background: none; color: var(--codex); padding: 0 6px; }
+.btn-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.btn small { font-size: 13px; opacity: .55; font-weight: 500; font-variant-numeric: tabular-nums; }
+.btn-sm { min-height: 30px; padding: 0 14px; font-size: 13px; }
+.btn svg { flex: none; }
 
 /* ── Herói ─────────────────────────────────────────────────────── */
-.hero { padding: clamp(56px, 9vw, 104px) 0 clamp(40px, 6vw, 72px); }
-.hero h1 span { color: var(--faint); }
-.hero .lede { margin-top: 26px; line-height: 1.68; }
-.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 38px; }
-.cta-note { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 14px; }
+.hero { position: relative; padding: clamp(48px, 8vw, 96px) 0 0; text-align: center; isolation: isolate; }
+.hero::before {
+  /* Brilho das duas cores atrás do título — estático, nada de fundo
+     em loop ocupando a tela. */
+  content: ''; position: absolute; inset: -10% 0 auto; height: 900px; z-index: -1;
+  background:
+    radial-gradient(40% 50% at 32% 30%, rgba(78,205,140,.16), transparent 70%),
+    radial-gradient(40% 50% at 68% 34%, rgba(110,155,255,.18), transparent 70%);
+  pointer-events: none;
+}
+.hero .lede { margin: 26px auto 0; text-align: center; }
+.hero h1 .two {
+  background: linear-gradient(100deg, var(--claude) 10%, #9FE3C1 45%, var(--codex) 90%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  padding-bottom: .06em;
+}
 
-/* Recorte da barra de menus do macOS. */
-.menubar {
-  margin-top: 44px;
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 8px 6px 14px; margin-bottom: 28px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.06);
   border: 1px solid var(--rule);
-  border-radius: 12px 12px 0 0;
-  background: linear-gradient(180deg, #101318, #0C0E12);
-  padding: 0 16px;
-  height: 34px;
-  display: flex; align-items: center; justify-content: flex-end;
-  gap: 20px;
-  font-family: var(--mono); font-size: 12.5px;
-  color: var(--faint);
+  font-size: 13.5px; color: var(--dim); text-decoration: none;
+  transition: background .2s, border-color .2s;
+  max-width: 100%;
+}
+.pill:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.14); }
+.pill b { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill .tag {
+  font-size: 11.5px; font-weight: 600; color: #000; background: var(--claude);
+  border-radius: 999px; padding: 1px 8px; flex: none;
+}
+.pill .tag:empty { display: none; }
+.pill svg { flex: none; opacity: .6; }
+
+/* O título entra materializando: desfoque e opacidade juntos. */
+.js .hero .rise {
+  opacity: 0; transform: translateY(18px); filter: blur(10px);
+  animation: rise 1.1s var(--spring) forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes rise { to { opacity: 1; transform: none; filter: blur(0); } }
+
+.cta { display: flex; flex-wrap: wrap; gap: 12px 16px; justify-content: center; align-items: center; margin-top: 38px; }
+.cta-note { font-size: 13px; color: var(--faint); margin-top: 16px; font-variant-numeric: tabular-nums; min-height: 1.5em; }
+
+/* ── A mesa do Mac: barra de menus, terminal e o painel ────────── */
+.stage-wrap { margin-top: clamp(44px, 6vw, 64px); perspective: 1600px; }
+.stage {
+  position: relative;
+  height: clamp(500px, 46vw, 540px);
+  border-radius: 22px;
   overflow: hidden;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.6),
+    0 40px 120px -30px rgba(0,0,0,.9),
+    0 0 120px -40px rgba(110,155,255,.35);
+  background:
+    radial-gradient(70% 90% at 0% 100%, #0F5A3F 0%, transparent 60%),
+    radial-gradient(70% 90% at 100% 0%, #1B3A8F 0%, transparent 60%),
+    radial-gradient(60% 70% at 70% 90%, #3A1C6B 0%, transparent 65%),
+    linear-gradient(160deg, #0B1630, #071A16);
 }
-.menubar .reading { color: var(--text); }
-.menubar .reading b { font-weight: 500; }
-.menubar .tag { color: var(--faint); margin-right: 5px; font-size: 11px; }
-.menubar .rest { display: flex; gap: 14px; align-items: center; opacity: .4; }
+.js .stage { opacity: 0; transform: translateY(40px) rotateX(8deg) scale(.97); transform-origin: 50% 0; transition: opacity 1s ease, transform 1.4s var(--spring); }
+.js .stage.in { opacity: 1; transform: none; }
 
-/* ── O painel, redesenhado ─────────────────────────────────────── */
-.panelwrap { display: flex; justify-content: flex-end; padding: 0 16px; }
+/* Barra de menus: vidro escuro sobre o papel de parede. */
+.menubar {
+  position: relative; z-index: 3;
+  height: 30px; padding: 0 10px 0 16px;
+  display: flex; align-items: center; gap: 18px;
+  font-size: 13px; color: rgba(255,255,255,.92);
+  background: rgba(10,12,16,.42);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+}
+.menubar .app { font-weight: 700; }
+.menubar .menus { display: flex; gap: 18px; color: rgba(255,255,255,.82); }
+.menubar .right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.mb-item {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 24px; padding: 0 8px; border-radius: 5px;
+  background: none; border: 0; cursor: pointer;
+  font-size: 13px; font-variant-numeric: tabular-nums;
+  transition: background .15s;
+}
+.mb-item:hover, .mb-item[aria-expanded="true"] { background: rgba(255,255,255,.18); }
+.mb-item .r { font-weight: 500; }
+.mb-item .r i { font-style: normal; font-size: 10.5px; font-weight: 600; opacity: .62; margin-right: 3px; }
+.mb-sys { display: flex; align-items: center; gap: 14px; padding: 0 6px; opacity: .9; font-variant-numeric: tabular-nums; }
+.lvl-warn { color: var(--warn); }
+.lvl-alert { color: var(--alert); }
+
+/* Terminal ao fundo: o contexto do que está sendo medido. */
+.term {
+  position: absolute; left: 6%; top: 74px; width: min(500px, 48%);
+  border-radius: 12px; overflow: hidden;
+  background: rgba(14,16,20,.82);
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 30px 70px -20px rgba(0,0,0,.7);
+  font: 12.5px/1.7 var(--mono);
+  color: #C9D1D9;
+}
+.term-top { height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 12px; background: rgba(255,255,255,.04); border-bottom: 1px solid rgba(255,255,255,.06); }
+.term-top i { width: 11px; height: 11px; border-radius: 50%; background: #3A3E46; }
+.term-top i:nth-child(1) { background: #FF5F57; } .term-top i:nth-child(2) { background: #FEBC2E; } .term-top i:nth-child(3) { background: #28C840; }
+.term-top span { margin: 0 auto; transform: translateX(-24px); font: 500 12px var(--sans); color: rgba(255,255,255,.5); }
+.term-body { padding: 14px 16px 18px; min-height: 240px; }
+.term-body div { white-space: pre-wrap; word-break: break-word; }
+.term .c-g { color: var(--claude); } .term .c-b { color: var(--codex); } .term .c-f { color: #6B7380; }
+.caret { display: inline-block; width: 7px; height: 14px; background: #C9D1D9; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* O painel: vidro claro sobre fundo escuro, ancorado no item da barra. */
 .panel {
-  width: min(430px, 100%);
-  background: linear-gradient(180deg, #14171D, #0F1216);
-  border: 1px solid var(--rule);
-  border-top: none;
-  border-radius: 0 0 14px 14px;
-  box-shadow: 0 30px 70px -30px rgba(0,0,0,.9);
-  padding: 14px 15px 12px;
-  animation: descend .5s cubic-bezier(.2,.8,.25,1) both;
+  position: absolute; z-index: 2; top: 36px; right: 14px;
+  width: 392px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    0 24px 70px -10px rgba(0,0,0,.65),
+    0 2px 8px rgba(0,0,0,.3);
+  font-size: 12px;
+  transform-origin: 82% 0;
+  /* Fechado por padrão; a mola leva até aberto. */
+  opacity: 0;
+  transform: translateY(-10px) scale(.94);
+  filter: blur(6px);
+  pointer-events: none;
+  transition: opacity .35s ease, transform var(--spring-dur) var(--spring), filter .4s ease;
+  will-change: transform, opacity;
 }
-@keyframes descend { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+.panel.open { opacity: 1; transform: none; filter: none; pointer-events: auto; }
 
-.panel-top { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
-.panel-top img { width: 17px; height: 17px; }
-.panel-top time { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); font-weight: 400; }
+.p-top { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.p-top img { width: 17px; height: 17px; }
+.p-top time { margin-left: auto; font: 400 11px var(--mono); color: var(--faint); }
 
-.dials { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-.dial { text-align: center; }
-.dial svg { width: 52px; height: 52px; display: block; margin: 0 auto 6px; }
-.dial .pct { font-family: var(--mono); font-size: 13.5px; font-weight: 600; fill: var(--text); }
-.dial .who { font-size: 10.5px; font-weight: 500; }
-.dial .win { font-size: 9.5px; color: var(--dim); }
-.dial .rst { font-family: var(--mono); font-size: 8.5px; color: var(--faint); }
+.dials { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; text-align: center; }
+.dial svg { width: 54px; height: 54px; display: block; margin: 0 auto 6px; overflow: visible; }
+.dial .ring { transition: stroke-dashoffset 1.2s var(--spring), stroke .4s ease; }
+.dial text { font: 600 13px var(--sans); fill: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.dial .who { font-size: 11px; font-weight: 600; }
+.dial .win { font-size: 10px; color: var(--dim); }
+.dial .rst { font: 9px var(--mono); color: var(--faint); }
 
-.tabs {
-  display: flex; gap: 2px; margin: 14px 0 12px;
-  background: rgba(255,255,255,.045); border-radius: 8px; padding: 2px;
-}
-.tabs span {
-  flex: 1; text-align: center; font-size: 11.5px; padding: 5px 0;
-  border-radius: 6px; color: var(--dim);
-}
-.tabs span.on { background: rgba(255,255,255,.13); color: var(--text); font-weight: 500; }
+.tabs { position: relative; display: flex; margin: 14px 0 10px; background: rgba(0,0,0,.25); border-radius: 8px; padding: 2px; }
+.tabs span { position: relative; z-index: 1; flex: 1; text-align: center; font-size: 11.5px; padding: 4px 0; color: var(--dim); }
+.tabs span.on { color: var(--text); font-weight: 500; }
+.tabs::before { content: ''; position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(25% - 1px); background: rgba(255,255,255,.14); border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
 
-.card { background: rgba(255,255,255,.045); border-radius: 9px; padding: 11px; margin-bottom: 9px; }
+.card { background: rgba(255,255,255,.055); border-radius: 10px; padding: 10px 11px; margin-bottom: 8px; }
+.card:last-child { margin-bottom: 0; }
 .card-head { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
-.card-head .dot { width: 6px; height: 6px; border-radius: 50%; }
-.card-head .cost { margin-left: auto; font-family: var(--mono); font-size: 11.5px; font-weight: 500; }
-.card-head .plan {
-  font-size: 8.5px; font-weight: 500; letter-spacing: .04em;
-  background: rgba(255,255,255,.12); border-radius: 20px; padding: 2px 6px; color: var(--dim);
-}
+.card-head .dot { width: 7px; height: 7px; border-radius: 50%; }
+.card-head .cost { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-head .cost small { font-weight: 400; color: var(--faint); margin-right: 4px; font-size: 10px; }
+.card-head .plan { font-size: 8.5px; font-weight: 600; letter-spacing: .05em; background: rgba(255,255,255,.12); border-radius: 20px; padding: 2px 6px; color: var(--dim); }
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); }
-.metrics div span { display: block; font-size: 9px; color: var(--faint); }
-.metrics div b { font-size: 12.5px; font-weight: 500; }
-.live { display: flex; align-items: center; gap: 5px; font-size: 10px; margin-top: 7px; color: var(--dim); }
+.metrics span { display: block; font-size: 9.5px; color: var(--faint); }
+.metrics b { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.live { display: flex; align-items: center; gap: 6px; font-size: 10.5px; margin-top: 8px; color: var(--dim); }
 .live b { color: var(--text); font-weight: 500; }
-.live .ctx { margin-left: auto; font-family: var(--mono); }
+.live .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--claude); box-shadow: 0 0 0 0 rgba(78,205,140,.6); animation: pulse 2s ease-out infinite; }
+@keyframes pulse { 70%, 100% { box-shadow: 0 0 0 6px rgba(78,205,140,0); } }
+.live .ctx { margin-left: auto; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.live .ctx em { display: block; width: 44px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; font-style: normal; }
+.live .ctx em::after { content: ''; display: block; height: 100%; width: var(--ctx, 31%); background: var(--claude); border-radius: 2px; transition: width .8s var(--spring); }
+
+/* Um número que acabou de mudar acende por um instante. */
+.tick { animation: tick .9s ease; }
+@keyframes tick { 0% { color: #fff; text-shadow: 0 0 10px rgba(255,255,255,.55); } 100% { text-shadow: none; } }
+
+.stage-hint {
+  position: absolute; z-index: 1; right: 22px; bottom: 18px;
+  font-size: 12px; color: rgba(255,255,255,.55);
+  display: flex; align-items: center; gap: 6px;
+}
+
+.h-touch { display: none; }
+@media (hover: none) { .h-touch { display: inline; } .h-mouse { display: none; } }
+
+@media (max-width: 860px) {
+  .term { display: none; }
+  .menubar .menus { display: none; }
+  .stage { height: auto; padding-bottom: 20px; }
+  .panel { position: relative; top: auto; right: auto; margin: 10px auto 0; width: calc(100% - 20px); max-width: 420px; }
+  .stage-hint { position: static; justify-content: center; margin-top: 14px; }
+}
+@media (max-width: 420px) {
+  .mb-sys .clock-d { display: none; }
+  .dial svg { width: 48px; height: 48px; }
+}
+
+/* ── Faixa de números ──────────────────────────────────────────── */
+.facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; text-align: left; margin-top: clamp(56px, 8vw, 96px); }
+.fact { padding: 6px 24px; border-left: 1px solid var(--rule); }
+.fact:first-child { border-left: 0; }
+.fact b { display: block; font: 600 clamp(32px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.fact span { display: block; margin-top: 8px; font-size: 14px; color: var(--dim); line-height: 1.4; }
+@media (max-width: 760px) {
+  .facts { grid-template-columns: 1fr 1fr; gap: 28px 0; }
+  .fact:nth-child(3) { border-left: 0; }
+}
 
 /* ── Seções ────────────────────────────────────────────────────── */
-.section { padding: clamp(58px, 8vw, 100px) 0; border-top: 1px solid var(--rule); }
-.section-head { max-width: 66ch; margin-bottom: 46px; }
-.section-head p { margin-top: 20px; }
+.section { padding: clamp(88px, 13vw, 160px) 0 0; }
+.section-head { max-width: 760px; margin-bottom: clamp(40px, 5vw, 64px); }
+.section-head .lede { margin-top: 22px; max-width: 46ch; }
+.section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+.section-head.center .lede { margin-left: auto; margin-right: auto; }
+.section-head.center .eyebrow { margin-left: auto; margin-right: auto; }
 
-.grid { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
-.grid.three { grid-template-columns: repeat(3, 1fr); }
-.grid.two { grid-template-columns: repeat(2, 1fr); }
-@media (max-width: 860px) { .grid.three, .grid.two { grid-template-columns: 1fr; } }
-.cell { background: var(--ink-2); padding: 26px 24px; }
-.cell .num { font-family: var(--mono); font-size: 11px; color: var(--faint); display: block; margin-bottom: 12px; }
-.cell h3 { margin-bottom: 9px; }
-.cell p { color: var(--dim); font-size: 14.5px; }
+/* Bento: cartões com luz que segue o ponteiro. */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.tile {
+  --mx: 50%; --my: 0%;
+  position: relative; overflow: hidden;
+  grid-column: span 2;
+  border-radius: 24px;
+  background: var(--ink-2);
+  border: 1px solid var(--rule);
+  padding: 30px 28px;
+  display: flex; flex-direction: column;
+}
+.tile::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx) var(--my), rgba(255,255,255,.06), transparent 60%);
+  opacity: 0; transition: opacity .4s ease;
+}
+@media (hover: hover) { .tile:hover::before { opacity: 1; } }
+.tile.w4 { grid-column: span 4; }
+.tile.w3 { grid-column: span 3; }
+.tile h3 { margin-bottom: 10px; }
+.tile p { color: var(--dim); font-size: 15.5px; line-height: 1.5; }
+.tile p strong { color: var(--text); font-weight: 500; }
+.tile .vis { margin-top: auto; padding-top: 28px; }
+@media (max-width: 960px) { .bento { grid-template-columns: 1fr 1fr; } .tile, .tile.w3, .tile.w4 { grid-column: span 2; } .tile.half { grid-column: span 1; } }
+@media (max-width: 600px) { .tile.half { grid-column: span 2; } .tile { padding: 26px 22px; } }
 
-/* Tabela de honestidade. */
-.truth { width: 100%; border-collapse: collapse; font-size: 14.5px; }
-.truth th, .truth td { text-align: left; padding: 15px 16px; border-bottom: 1px solid var(--rule); }
-.truth th { font-size: 11px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
-.truth td:first-child { color: var(--dim); }
-.truth .yes { color: var(--claude); font-weight: 500; }
-.truth .est { color: var(--warn); font-weight: 500; }
-.truth tr:last-child td { border-bottom: none; }
-.tablebox { border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--ink-2); }
+/* Cartão 1: anel arrastável. Manipulação direta, 1:1 com o dedo. */
+.limit { display: grid; grid-template-columns: auto 1fr; gap: 32px; align-items: center; }
+@media (max-width: 600px) { .limit { grid-template-columns: 1fr; justify-items: center; gap: 22px; } }
+.big-ring { width: 168px; height: 168px; position: relative; }
+.big-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.big-ring .ring { transition: stroke .35s ease; }
+.big-ring .val {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  font: 600 40px/1 var(--display); letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+}
+.big-ring .val small { display: block; font: 500 12px var(--sans); letter-spacing: 0; color: var(--faint); margin-top: 4px; }
+.limit-ctl { width: 100%; }
+.mini-bar {
+  display: inline-flex; align-items: center; gap: 10px;
+  height: 30px; padding: 0 12px; border-radius: 8px;
+  background: rgba(255,255,255,.06); border: 1px solid var(--rule);
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.mini-bar .r { font-weight: 600; transition: color .35s ease; }
+.mini-bar .r i { font-style: normal; font-size: 10.5px; opacity: .6; margin-right: 3px; }
+.mini-bar .muted { font-size: 12px; }
 
-/* Passos de instalação. */
-.steps { counter-reset: s; display: grid; gap: 18px; }
-.step { display: grid; grid-template-columns: 30px 1fr; gap: 16px; align-items: start; }
+.slider { position: relative; margin-top: 22px; }
+.slider input {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 36px; margin: 0; background: none; cursor: grab;
+  touch-action: pan-y;
+}
+.slider input:active { cursor: grabbing; }
+.slider input::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--claude) 0 60%, var(--warn) 60% 85%, var(--alert) 85%);
+  opacity: .9;
+}
+.slider input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--claude) 0 60%, var(--warn) 60% 85%, var(--alert) 85%); }
+.slider input::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 26px; height: 26px; margin-top: -10px; border-radius: 50%;
+  background: #fff; border: 0;
+  box-shadow: 0 2px 10px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.1);
+  transition: transform .2s var(--spring);
+}
+.slider input::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+.slider input:active::-webkit-slider-thumb { transform: scale(1.12); }
+.slider input:focus-visible { outline: 2px solid var(--codex); outline-offset: 4px; border-radius: 6px; }
+.scale { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--faint); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.scale span:nth-child(2) { position: absolute; left: 60%; transform: translateX(-50%); }
+.scale span:nth-child(3) { position: absolute; left: 85%; transform: translateX(-50%); }
+.scale { position: relative; }
+
+/* O banner de aviso desce quando o arraste passa de 80%. */
+.banner {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 20px; padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(40,42,48,.8);
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 14px 30px -10px rgba(0,0,0,.6);
+  font-size: 13px; line-height: 1.35;
+  opacity: 0; transform: translateY(-8px) scale(.97);
+  transition: opacity .25s ease, transform var(--spring-dur) var(--spring);
+}
+.banner.on { opacity: 1; transform: none; }
+.banner img { width: 30px; height: 30px; flex: none; }
+.banner b { display: block; font-weight: 600; }
+.banner span { color: var(--dim); }
+
+/* Cartão 2: barra empilhada dos tokens. */
+.stack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; background: rgba(255,255,255,.04); }
+.stack i { display: block; height: 100%; transform-origin: 0 50%; }
+.js .stack i { transform: scaleX(0); transition: transform 1.1s var(--spring); transition-delay: var(--d, 0s); }
+.js .in .stack i { transform: none; }
+.legend { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 18px; }
+.legend div { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 8px; }
+.legend div b { margin-left: auto; color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.costline { display: flex; align-items: baseline; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.costline b { font: 600 34px/1 var(--display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.costline span { font-size: 13px; color: var(--dim); }
+
+/* Cartão 3: sessão ativa. */
+.session { border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid var(--rule); padding: 14px 16px; font-size: 13px; }
+.session .row { display: flex; align-items: center; gap: 8px; }
+.session .row + .row { margin-top: 10px; }
+.session .row span { color: var(--faint); }
+.session .row b { margin-left: auto; font-weight: 500; font-family: var(--mono); font-size: 12px; }
+.ctxbar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 12px; }
+.ctxbar i { display: block; height: 100%; width: 64%; border-radius: 3px; background: linear-gradient(90deg, var(--claude), #9FE3C1); transform-origin: 0 50%; }
+.js .ctxbar i { transform: scaleX(0); transition: transform 1.6s var(--spring) .2s; }
+.js .in .ctxbar i { transform: none; }
+
+/* Cartões de ícone. */
+.glyph {
+  width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 22px;
+  background: linear-gradient(150deg, rgba(255,255,255,.1), rgba(255,255,255,.03));
+  border: 1px solid var(--rule);
+}
+
+/* ── Os números: comparação honesta ────────────────────────────── */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
+.side { border-radius: 24px; padding: 30px 28px; background: var(--ink-2); border: 1px solid var(--rule); position: relative; overflow: hidden; }
+.side::after { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: var(--c); opacity: .9; }
+.side .head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.side .head i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 12px var(--c); }
+.side .head h3 { font-size: 24px; }
+.side .verdict { font: 600 clamp(28px, 3.4vw, 38px)/1.1 var(--display); letter-spacing: -.035em; color: var(--c); margin: 18px 0 8px; }
+.side > p { color: var(--dim); font-size: 15.5px; }
+.side ul { list-style: none; margin: 22px 0 0; padding: 0; border-top: 1px solid var(--rule); }
+.side li { display: flex; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--rule-2); font-size: 14.5px; }
+.side li:last-child { border-bottom: 0; padding-bottom: 0; }
+.side li span { color: var(--dim); }
+.side li b { font-weight: 500; text-align: right; }
+.side li b.est { color: var(--warn); }
+
+.trust { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
+@media (max-width: 960px) { .trust { grid-template-columns: 1fr; } }
+.trust .tile { grid-column: auto; }
+.order { list-style: none; counter-reset: o; margin: 20px 0 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.order li { counter-increment: o; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--rule-2); color: var(--dim); }
+.order li::before { content: counter(o); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.1); color: var(--text); }
+.order li:first-child { color: var(--text); }
+.order li:first-child::before { background: var(--text); color: #000; }
+
+/* ── Instalar ──────────────────────────────────────────────────── */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
+@media (max-width: 960px) { .steps { grid-template-columns: 1fr; } }
+.step { border-radius: 24px; padding: 28px; background: var(--ink-2); border: 1px solid var(--rule); counter-increment: s; display: flex; flex-direction: column; }
 .step::before {
-  counter-increment: s; content: counter(s);
-  font-family: var(--mono); font-size: 12px; color: var(--faint);
-  border: 1px solid var(--rule); border-radius: 50%;
-  width: 30px; height: 30px; display: grid; place-items: center;
+  content: counter(s);
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  font: 600 15px var(--display); margin-bottom: 22px;
+  background: var(--text); color: #000;
 }
-.step p { color: var(--dim); font-size: 14.5px; margin-top: 4px; }
-code, .code {
-  font-family: var(--mono); font-size: 13px;
-  background: var(--void); border: 1px solid var(--rule);
-  border-radius: 8px; padding: 2px 7px; color: var(--text);
-}
-.code { display: block; padding: 13px 15px; margin-top: 10px; overflow-x: auto; white-space: pre; }
+.step h3 { margin-bottom: 10px; }
+.step p { color: var(--dim); font-size: 15.5px; }
+.step p strong { color: var(--text); font-weight: 500; }
+.step .btn { margin-top: auto; align-self: flex-start; }
+.step .gap { flex: 1; min-height: 22px; }
+code { font-family: var(--mono); font-size: .86em; background: rgba(255,255,255,.07); border-radius: 6px; padding: 2px 6px; color: var(--text); }
 
-/* Novidades. */
-.releases { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
-.release { background: var(--ink-2); padding: 24px; display: grid; grid-template-columns: 150px 1fr; gap: 24px; }
-@media (max-width: 720px) { .release { grid-template-columns: 1fr; gap: 10px; } }
-.release .meta .v { font-family: var(--mono); font-size: 15px; font-weight: 600; }
-.release .meta .d { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
-.release .meta .now {
-  display: inline-block; margin-top: 7px; font-size: 10px; font-family: var(--mono);
-  color: var(--claude); border: 1px solid color-mix(in oklab, var(--claude) 35%, transparent);
-  border-radius: 20px; padding: 1px 8px;
+.cmd {
+  margin-top: auto; display: flex; align-items: stretch;
+  border-radius: 12px; background: var(--void); border: 1px solid var(--rule); overflow: hidden;
 }
-.release h3 { margin-bottom: 10px; }
-.release ul { margin: 0; padding-left: 17px; color: var(--dim); font-size: 14.5px; }
+.cmd code { flex: 1; min-width: 0; background: none; padding: 13px 14px; font-size: 12.5px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; border-radius: 0; }
+.cmd code::-webkit-scrollbar { display: none; }
+.copy {
+  flex: none; display: grid; place-items: center; width: 48px;
+  background: rgba(255,255,255,.05); border: 0; border-left: 1px solid var(--rule); cursor: pointer;
+  color: var(--dim); transition: background .2s, color .2s;
+  touch-action: manipulation;
+}
+.copy:hover { background: rgba(255,255,255,.1); color: var(--text); }
+.copy:active svg { transform: scale(.88); }
+.copy svg { transition: transform .2s var(--spring); }
+.copy .ok { display: none; color: var(--claude); }
+.copy.done .ok { display: block; animation: pop .5s var(--spring); }
+.copy.done .cp { display: none; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } }
+.alt { font-size: 13px; color: var(--faint); margin-top: 12px; }
+
+/* ── Novidades: linha do tempo ─────────────────────────────────── */
+.timeline { position: relative; max-width: 860px; }
+.timeline::before { content: ''; position: absolute; left: 7px; top: 10px; bottom: 10px; width: 1px; background: linear-gradient(var(--rule), var(--rule) 80%, transparent); }
+.release { position: relative; padding: 0 0 44px 44px; }
+.release::before {
+  content: ''; position: absolute; left: 3px; top: 8px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ink); border: 1px solid var(--faint);
+}
+.release.now::before { background: var(--claude); border-color: var(--claude); box-shadow: 0 0 0 5px rgba(78,205,140,.15); }
+.release .meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.release .meta .v { font-weight: 600; color: var(--text); font-size: 14px; }
+.release .meta .badge { color: #000; background: var(--claude); font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; }
+.release h3 { margin: 8px 0 10px; font-size: 22px; }
+.release ul { margin: 0; padding-left: 18px; color: var(--dim); font-size: 15.5px; }
 .release li { margin-bottom: 6px; }
-.release .dl { margin-top: 12px; font-size: 13px; }
-.release .dl a { color: var(--text); }
-.release .sha { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 6px; word-break: break-all; }
-
-/* Autoria */
-.author { display: flex; gap: 28px; align-items: flex-start; }
-@media (max-width: 640px) { .author { flex-direction: column; gap: 20px; } }
-.author-role { font-size: 16px; font-weight: 500; color: var(--text); margin-top: 14px; }
-.author-stack {
-  font-family: var(--mono); font-size: 12.5px; color: var(--dim);
-  margin-top: 10px; line-height: 1.7; max-width: 58ch;
+.release li::marker { color: var(--faint); }
+.release .dl { margin-top: 12px; font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.release .dl a { color: var(--codex); text-decoration: none; }
+.release .dl a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.release .sha { font: 10.5px var(--mono); color: var(--faint); word-break: break-all; }
+.timeline:not(.all) .release.extra { display: none; }
+.more {
+  margin-left: 44px; border: 0; cursor: pointer;
+  min-height: 40px; padding: 0 18px; border-radius: 999px;
+  background: rgba(255,255,255,.08); font-size: 14px; font-weight: 500;
+  transition: background .2s, transform .25s var(--spring);
 }
-.author-focus { font-size: 14.5px; color: var(--faint); margin-top: 8px; }
+.more:hover { background: rgba(255,255,255,.13); }
+.more:active { transform: scale(.96); transition-duration: .08s; }
+.more[hidden] { display: none; }
+.skeleton { height: 120px; border-radius: 16px; background: linear-gradient(90deg, var(--ink-2), var(--ink-3), var(--ink-2)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; margin-left: 44px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
 
+/* ── Chamada final ─────────────────────────────────────────────── */
+.final { text-align: center; padding: clamp(100px, 14vw, 180px) 0 clamp(80px, 10vw, 120px); position: relative; isolation: isolate; }
+.final::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: min(900px, 120vw); height: 600px; transform: translate(-50%, -50%); z-index: -1;
+  background: radial-gradient(closest-side, rgba(110,155,255,.14), rgba(78,205,140,.06) 55%, transparent);
+  pointer-events: none;
+}
+.final .appicon { width: 112px; height: 112px; margin: 0 auto 32px; display: block; filter: drop-shadow(0 20px 40px rgba(0,0,0,.6)) drop-shadow(0 0 40px rgba(78,205,140,.18)); }
+.final .lede { margin: 22px auto 0; text-align: center; }
+
+/* ── Autoria e rodapé ──────────────────────────────────────────── */
+.author { display: flex; gap: 28px; align-items: center; padding: 32px; border-radius: 24px; background: var(--ink-2); border: 1px solid var(--rule); }
+@media (max-width: 640px) { .author { flex-direction: column; align-items: flex-start; gap: 20px; padding: 26px 22px; } }
 .author-mark {
-  flex: none;
-  width: 66px; height: 66px; border-radius: 18px;
+  flex: none; width: 72px; height: 72px; border-radius: 50%;
   display: grid; place-items: center;
-  font-family: var(--mono); font-size: 20px; font-weight: 600; letter-spacing: .02em;
-  color: var(--ink);
+  font: 600 24px var(--display); letter-spacing: -.02em; color: #000;
   background: linear-gradient(140deg, var(--claude), var(--codex));
 }
+.author h3 { font-size: 24px; }
+.author .role { color: var(--dim); margin-top: 4px; font-size: 15.5px; }
+.author .stack-l { font: 12.5px/1.7 var(--mono); color: var(--faint); margin-top: 8px; }
+.author .btn { margin-left: auto; flex: none; }
+@media (max-width: 640px) { .author .btn { margin-left: 0; } }
 
-footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--faint); font-size: 13.5px; }
-.footrow { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
+footer { margin-top: clamp(64px, 8vw, 100px); border-top: 1px solid var(--rule); padding: 28px 0 calc(40px + env(safe-area-inset-bottom)); color: var(--faint); font-size: 13px; }
+.footrow { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+footer a { color: var(--dim); text-decoration: none; }
+footer a:hover { color: var(--text); }
+
+/* ── Acessibilidade: movimento, transparência, contraste ───────── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .js .reveal, .js .stage, .js .hero .rise { transform: none !important; filter: none !important; transition: opacity .3s ease !important; animation-name: fade !important; animation-duration: .3s !important; }
+  .panel { transform: none !important; filter: none !important; transition: opacity .25s ease; }
+  .banner { transform: none !important; }
+  .js .stack i, .js .ctxbar i { transform: none !important; transition: none !important; }
+  .caret, .live .pulse, .skeleton { animation: none !important; }
+  .tick { animation: none; }
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-transparency: reduce) {
+  header { background: var(--ink); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .menubar { background: #15181D; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .panel { background: #1C1F25; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  :root { --dim: #D0D5DC; --faint: #A6ADB8; --rule: rgba(255,255,255,.3); }
+  .panel { background: #1C1F25; border-color: rgba(255,255,255,.4); }
+}
 </style>
 </head>
 <body>
 
-<header>
+<header id="top">
   <div class="wrap bar">
-    <span class="brand"><img src="icon.svg" alt=""> TokenBar</span>
-    <nav class="nav">
+    <a class="brand" href="#"><img src="icon.svg" alt="" width="24" height="24"> TokenBar</a>
+    <nav class="nav" aria-label="Seções">
       <a href="#painel">O painel</a>
       <a href="#numeros">Os números</a>
       <a href="#instalar">Instalar</a>
       <a href="#novidades">Novidades</a>
-      <a href="#autor">Quem fez</a>
     </nav>
+    <a class="btn btn-main btn-sm" data-download href="#instalar" download>Baixar</a>
   </div>
 </header>
 
 <main>
 <section class="hero">
   <div class="wrap">
-    <p class="eyebrow">macOS · Apple Silicon · gratuito</p>
-    <h1>Quanto você já gastou<br><span>do Claude e do Codex.</span></h1>
-    <p class="lede">
-      Um mostrador na barra de menus com o consumo das duas ferramentas: o quanto resta
-      da janela de 5 horas, o total da semana, o custo do dia e a sessão que está rodando
-      agora. Sem abrir nada, sem sair do que você está fazendo.
+    <a class="pill rise" href="#novidades" id="newpill" style="--d:.0s">
+      <span class="tag" id="pilltag"></span>
+      <b id="pilltext">macOS · Apple Silicon · gratuito</b>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <h1><span class="rise" style="--d:.08s;display:block">Quanto você já gastou</span><span class="rise two" style="--d:.18s;display:block">do Claude e do Codex.</span></h1>
+    <p class="lede rise" style="--d:.3s">
+      Um mostrador na barra de menus do Mac com <strong>o quanto resta da janela de 5 horas</strong>,
+      o total da semana, o custo do dia e a sessão que está rodando agora.
     </p>
-    <div class="cta">
-      <a class="btn btn-main" id="baixar" href="#instalar" download>
-        Baixar para Mac <small id="verlabel"></small>
+    <div class="cta rise" style="--d:.4s">
+      <a class="btn btn-main" data-download href="#instalar" download>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 2v9M4 7.5 8 11.5l4-4M3 14h10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Baixar para Mac <small data-ver></small>
       </a>
-      <a class="btn btn-ghost" href="#numeros">Como os números são obtidos</a>
+      <a class="btn btn-link" href="#numeros">Como os números são obtidos ›</a>
     </div>
-    <p class="cta-note" id="filenote"></p>
+    <p class="cta-note rise" style="--d:.46s" data-filenote>Apple Silicon · macOS 14+ · sem conta, sem telemetria</p>
 
-    <!-- A barra de menus e o painel: o produto, não uma captura dele. -->
-    <div class="menubar">
-      <span class="reading"><span class="tag">CC</span><b>42%</b></span>
-      <span class="reading"><span class="tag">CX</span><b>4%</b></span>
-      <span class="rest" aria-hidden="true">
-        <svg width="15" height="11" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.3">
-          <path d="M1 3.6a9 9 0 0 1 13 0M3.5 6.2a5.5 5.5 0 0 1 8 0"/><circle cx="7.5" cy="9" r=".9" fill="currentColor" stroke="none"/>
-        </svg>
-        <svg width="18" height="11" viewBox="0 0 18 11" fill="none" stroke="currentColor" stroke-width="1.1">
-          <rect x=".6" y="1.6" width="14" height="7.8" rx="2.2"/><path d="M16 4.4v3.2" stroke-linecap="round"/>
-          <rect x="2.2" y="3.2" width="6" height="4.6" rx="1" fill="currentColor" stroke="none"/>
-        </svg>
-        <span>22:51</span>
-      </span>
-    </div>
-    <div class="panelwrap">
-      <div class="panel">
-        <div class="panel-top"><img src="icon.svg" alt=""> TokenBar <time>22:51</time></div>
+    <!-- A mesa do Mac. Não é captura de tela: é o instrumento, funcionando. -->
+    <div class="stage-wrap">
+      <div class="stage" id="stage">
+        <div class="menubar">
+          <span class="app">Terminal</span>
+          <span class="menus" aria-hidden="true"><span>Shell</span><span>Editar</span><span>Visualizar</span><span>Janela</span><span>Ajuda</span></span>
+          <span class="right">
+            <button class="mb-item" id="mbtoggle" aria-expanded="false" aria-controls="panel" aria-label="Abrir o painel do TokenBar">
+              <span class="r" id="mb-cc"><i>CC</i><b>42%</b></span>
+              <span class="r" id="mb-cx"><i>CX</i><b>4%</b></span>
+            </button>
+            <span class="mb-sys" aria-hidden="true">
+              <svg width="16" height="12" viewBox="0 0 15 11" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1 3.6a9 9 0 0 1 13 0M3.5 6.2a5.5 5.5 0 0 1 8 0"/><circle cx="7.5" cy="9" r=".9" fill="currentColor" stroke="none"/></svg>
+              <svg width="22" height="11" viewBox="0 0 18 11" fill="none" stroke="currentColor" stroke-width="1.1"><rect x=".6" y="1.6" width="14" height="7.8" rx="2.2"/><path d="M16 4.4v3.2" stroke-linecap="round"/><rect x="2.2" y="3.2" width="9" height="4.6" rx="1" fill="currentColor" stroke="none"/></svg>
+              <span class="clock-d" data-clock-day>qui. 8 de out.</span>
+              <span data-clock>22:51</span>
+            </span>
+          </span>
+        </div>
 
-        <div class="dials">
-          <div class="dial" data-dial data-pct="42" data-color="claude">
-            <div class="who">Claude</div><div class="win">sessão 5h</div><div class="rst">reseta 00:45</div>
+        <div class="term" aria-hidden="true">
+          <div class="term-top"><i></i><i></i><i></i><span>tokenbar — claude</span></div>
+          <div class="term-body" id="term"></div>
+        </div>
+
+        <div class="panel" id="panel" role="region" aria-label="Painel do TokenBar">
+          <div class="p-top"><img src="icon.svg" alt="" width="17" height="17"> TokenBar <time data-clock>22:51</time></div>
+          <div class="dials">
+            <div class="dial" data-dial="cc5" data-pct="42" data-color="claude"><div class="who">Claude</div><div class="win">sessão 5h</div><div class="rst">reseta 00:45</div></div>
+            <div class="dial" data-dial="ccw" data-pct="16" data-color="claude"><div class="who">Claude</div><div class="win">semanal</div><div class="rst">reseta qui 12:00</div></div>
+            <div class="dial" data-dial="cx5" data-pct="4" data-color="codex"><div class="who">Codex</div><div class="win">sessão 5h</div><div class="rst">reseta 00:35</div></div>
+            <div class="dial" data-dial="cxw" data-pct="16" data-color="codex"><div class="who">Codex</div><div class="win">semanal</div><div class="rst">reseta sáb 14:30</div></div>
           </div>
-          <div class="dial" data-dial data-pct="16" data-color="claude">
-            <div class="who">Claude</div><div class="win">semanal</div><div class="rst">reseta qui 12:00</div>
+          <div class="tabs" aria-hidden="true"><span class="on">Visão geral</span><span>Claude</span><span>Codex</span><span>Ajustes</span></div>
+          <div class="card">
+            <div class="card-head"><i class="dot" style="background:var(--claude)"></i> Claude Code <span class="cost"><small>hoje</small><span id="cc-cost">$24.90</span></span></div>
+            <div class="metrics">
+              <div><span>hoje</span><b id="cc-today">31.1M</b></div>
+              <div><span>ciclo</span><b id="cc-cycle">142.5M</b></div>
+              <div><span>cache</span><b>98%</b></div>
+            </div>
+            <div class="live"><i class="pulse"></i><b>tokenbar</b> · opus-5.5 <span class="ctx" id="ctx" style="--ctx:31%"><em></em><span id="ctx-v">31%</span></span></div>
           </div>
-          <div class="dial" data-dial data-pct="4" data-color="codex">
-            <div class="who">Codex</div><div class="win">sessão 5h</div><div class="rst">reseta 00:35</div>
-          </div>
-          <div class="dial" data-dial data-pct="16" data-color="codex">
-            <div class="who">Codex</div><div class="win">semanal</div><div class="rst">reseta sab 14:30</div>
+          <div class="card">
+            <div class="card-head"><i class="dot" style="background:var(--codex)"></i> Codex <span class="plan">PLUS</span> <span class="cost"><small>hoje</small>$22.59</span></div>
+            <div class="metrics">
+              <div><span>hoje</span><b>29.6M</b></div>
+              <div><span>semana</span><b>258.1M</b></div>
+              <div><span>cache</span><b>96%</b></div>
+            </div>
           </div>
         </div>
 
-        <div class="tabs"><span class="on">Visão geral</span><span>Claude</span><span>Codex</span><span>Ajustes</span></div>
-
-        <div class="card">
-          <div class="card-head">
-            <i class="dot" style="background:var(--claude)"></i> Claude Code
-            <span class="cost">$24.90</span>
-          </div>
-          <div class="metrics">
-            <div><span>hoje</span><b>31.1M</b></div>
-            <div><span>ciclo</span><b>142.5M</b></div>
-            <div><span>cache</span><b>98%</b></div>
-          </div>
-          <div class="live">⚡ <b>tokenbar</b> · opus-5 <span class="ctx">ctx 31%</span></div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <i class="dot" style="background:var(--codex)"></i> Codex
-            <span class="plan">PLUS</span>
-            <span class="cost">$22.59</span>
-          </div>
-          <div class="metrics">
-            <div><span>hoje</span><b>29.6M</b></div>
-            <div><span>7 dias</span><b>258.1M</b></div>
-            <div><span>cache</span><b>96%</b></div>
-          </div>
-        </div>
+        <p class="stage-hint">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3 1.5v11l3-3 2 5 2-.8-2-4.9h4.2z"/></svg>
+          <span class="h-mouse">Clique em</span><span class="h-touch">Toque em</span> <b style="font-weight:600;color:#fff;margin:0 2px">CC&nbsp;CX</b> na barra
+        </p>
       </div>
+    </div>
+
+    <div class="facts">
+      <div class="fact reveal"><b>0</b><span>contas para criar, logins ou chaves de API</span></div>
+      <div class="fact reveal" style="--d:.06s"><b>0</b><span>bytes do seu uso saindo da máquina</span></div>
+      <div class="fact reveal" style="--d:.12s"><b data-size>1,2 MB</b><span>de app nativo, AppKit e SwiftUI</span></div>
+      <div class="fact reveal" style="--d:.18s"><b>2</b><span>ferramentas lado a lado, cada uma com sua cor</span></div>
     </div>
   </div>
 </section>
 
 <section class="section" id="painel">
   <div class="wrap">
-    <div class="section-head">
+    <div class="section-head reveal">
       <p class="eyebrow">O painel</p>
-      <h2>Passa o mouse, ele desce.</h2>
-      <p class="lede">Nada de abrir aplicativo, nada de rodar comando. O painel aparece onde o
-        ponteiro já está e some quando você sai.</p>
+      <h2>Passa o mouse,<br>ele desce.</h2>
+      <p class="lede">Nada de abrir aplicativo, nada de rodar comando. O painel aparece onde o ponteiro
+        já está e some quando você sai.</p>
     </div>
-    <div class="grid three">
-      <div class="cell">
-        <span class="num">01</span>
+
+    <div class="bento">
+      <article class="tile w4 reveal" data-spot>
         <h3>Quanto falta da sessão</h3>
-        <p>Os quatro anéis mostram as janelas de 5 horas e as semanais das duas ferramentas,
-          com o horário exato em que cada uma reseta. O número na barra fica laranja aos 60%
-          e vermelho aos 85%, então você percebe antes de bater.</p>
-      </div>
-      <div class="cell">
-        <span class="num">02</span>
+        <p>Os anéis mostram as janelas de 5 horas e as semanais das duas ferramentas, com o horário
+          exato do reset. O número na barra fica <strong style="color:var(--warn)">laranja aos 60%</strong>
+          e <strong style="color:var(--alert)">vermelho aos 85%</strong>. <span class="muted">Arraste para ver.</span></p>
+        <div class="vis limit">
+          <div class="big-ring" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"/>
+              <circle class="ring" id="bigring" cx="60" cy="60" r="52" fill="none" stroke="var(--claude)" stroke-width="10" stroke-linecap="round"/>
+            </svg>
+            <div class="val"><div><span id="bigval">42</span>%<small>sessão 5h</small></div></div>
+          </div>
+          <div class="limit-ctl">
+            <span class="mini-bar" aria-hidden="true"><span class="r" id="minir"><i>CC</i><span id="minival">42</span>%</span><span class="muted">qui. 22:51</span></span>
+            <div class="slider">
+              <input type="range" id="limit" min="0" max="100" value="42" aria-label="Simular o uso da janela de 5 horas">
+              <div class="scale" aria-hidden="true"><span>0%</span><span>60</span><span>85</span><span>100%</span></div>
+            </div>
+            <div class="banner" id="banner" aria-live="polite">
+              <img src="icon.svg" alt="" width="30" height="30">
+              <div><b>Claude passou de 80% da sessão</b><span>A janela de 5h reseta às 00:45. Um aviso por janela, limiar ajustável.</span></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="tile half reveal" style="--d:.08s" data-spot>
         <h3>Para onde foram os tokens</h3>
-        <p>Consumo do dia e do ciclo separado por entrada, saída, cache lido e cache escrito,
-          além do custo por modelo. É onde se descobre que 30 milhões de tokens custaram
-          poucos dólares porque 97% vieram do cache.</p>
-      </div>
-      <div class="cell">
-        <span class="num">03</span>
+        <p>Entrada, saída, cache lido e cache escrito, com o custo por modelo.</p>
+        <div class="vis">
+          <div class="stack" aria-hidden="true">
+            <i style="width:4%;background:#F2F4F7;--d:.1s"></i>
+            <i style="width:3%;background:var(--codex);--d:.18s"></i>
+            <i style="width:86%;background:var(--claude);--d:.26s"></i>
+            <i style="width:7%;background:#9FE3C1;--d:.34s"></i>
+          </div>
+          <div class="legend">
+            <div><i style="background:#F2F4F7"></i>entrada<b>1.2M</b></div>
+            <div><i style="background:var(--codex)"></i>saída<b>0.9M</b></div>
+            <div><i style="background:var(--claude)"></i>cache lido<b>26.8M</b></div>
+            <div><i style="background:#9FE3C1"></i>cache escrito<b>2.2M</b></div>
+          </div>
+          <div class="costline"><b>$24.90</b><span>por 31 milhões de tokens — 97% veio do cache</span></div>
+        </div>
+      </article>
+
+      <article class="tile half reveal" data-spot>
         <h3>A sessão que está rodando</h3>
-        <p>Qual projeto, qual modelo e quanto da janela de contexto já foi preenchido —
-          útil para saber se está perto de precisar compactar.</p>
-      </div>
+        <p>Qual projeto, qual modelo e quanto da janela de contexto já foi preenchido — para saber se
+          está perto de compactar.</p>
+        <div class="vis">
+          <div class="session">
+            <div class="row"><i class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--claude)"></i><span>projeto</span><b>tokenbar</b></div>
+            <div class="row"><span>modelo</span><b>opus-5.5</b></div>
+            <div class="row"><span>contexto</span><b>64%</b></div>
+            <div class="ctxbar"><i></i></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="tile reveal" style="--d:.06s" data-spot>
+        <div class="glyph" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--codex)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.3 7.5 9.5 4.3-1.2 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>
+        </div>
+        <h3>Nada seu sai da máquina</h3>
+        <p>Lê os registros que as duas ferramentas já gravam no disco. Não acessa credenciais e não
+          tem telemetria.</p>
+      </article>
+
+      <article class="tile reveal" style="--d:.12s" data-spot>
+        <div class="glyph" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--claude)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4.5h-4.5"/></svg>
+        </div>
+        <h3>Atualiza sozinho</h3>
+        <p>Verifica, baixa e instala versões novas pelos Ajustes. É a única conexão que o app faz — e
+          dá para desligar.</p>
+      </article>
     </div>
   </div>
 </section>
 
 <section class="section" id="numeros">
   <div class="wrap">
-    <div class="section-head">
+    <div class="section-head reveal">
       <p class="eyebrow">Os números</p>
-      <h2>Metade é exata. A outra metade avisa que não é.</h2>
-      <p class="lede">
-        O Codex grava o percentual real do limite nos próprios registros, vindo do servidor —
-        o TokenBar só lê. O Claude Code não grava: o limite só aparece depois que a API já
-        recusou uma requisição. Por isso o percentual do Claude é calculado, e vem marcado
-        com ✨ na interface.
-      </p>
+      <h2>Metade é exata.<br>A outra avisa que não é.</h2>
+      <p class="lede">O Codex grava o percentual real do limite, vindo do servidor. O Claude Code não —
+        por isso o percentual dele é calculado, e vem marcado com ✨ no painel.</p>
     </div>
 
-    <div class="tablebox">
-      <table class="truth">
-        <tr><th></th><th>Codex</th><th>Claude Code</th></tr>
-        <tr><td>Limite de 5 horas</td><td class="yes">exato</td><td class="est">calculado ✨</td></tr>
-        <tr><td>Limite semanal</td><td class="yes">exato</td><td class="est">calculado ✨</td></tr>
-        <tr><td>Tokens e custo</td><td class="yes">exato</td><td class="yes">exato</td></tr>
-        <tr><td>Precisa configurar</td><td>não</td><td>calibrar uma vez, dentro do app</td></tr>
-      </table>
+    <div class="compare">
+      <article class="side reveal" style="--c:var(--codex)">
+        <div class="head"><i></i><h3>Codex</h3></div>
+        <p class="verdict">Exato.</p>
+        <p>O percentual das janelas de 5h e semanal vem do servidor, gravado pelo próprio Codex. O
+          TokenBar só lê.</p>
+        <ul>
+          <li><span>Percentual do limite</span><b>exato</b></li>
+          <li><span>Janela e horário de reset</span><b>exato</b></li>
+          <li><span>Tokens e custo</span><b>exato</b></li>
+          <li><span>Precisa configurar</span><b>não</b></li>
+        </ul>
+      </article>
+      <article class="side reveal" style="--c:var(--claude);--d:.08s">
+        <div class="head"><i></i><h3>Claude Code</h3></div>
+        <p class="verdict">Calculado ✨</p>
+        <p>O limite só aparece quando a API já recusou. O app converte o consumo em custo e compara
+          com um teto que se corrige sozinho, sem nunca passar de 100%.</p>
+        <ul>
+          <li><span>Percentual do limite</span><b class="est">estimado ✨</b></li>
+          <li><span>Janela e horário de reset</span><b>exato</b></li>
+          <li><span>Tokens e custo</span><b>exato</b></li>
+          <li><span>Precisa configurar</span><b>opcional, uma vez</b></li>
+        </ul>
+      </article>
     </div>
 
-    <div class="grid two" style="margin-top:26px">
-      <div class="cell">
-        <h3>Calibrar leva cinco segundos</h3>
-        <p>Você abre o painel de uso do app da Anthropic, digita o percentual que ele mostra
-          na aba Ajustes e pronto — o TokenBar calcula o teto sozinho. Vale repetir de vez em
-          quando: o limite muda com bônus temporários e com mudança de plano.</p>
-      </div>
-      <div class="cell">
-        <h3>Nada seu sai da máquina</h3>
-        <p>O app lê os registros que as duas ferramentas já gravam no seu disco. Não acessa
-          credenciais, não há conta para criar nem telemetria. A única conexão que ele faz é
-          consultar se existe versão nova — uma requisição sem enviar dado algum, que pode ser
-          desligada nos Ajustes.</p>
-      </div>
+    <div class="trust">
+      <article class="tile reveal" data-spot>
+        <h3>O teto aprende</h3>
+        <p>Se uma janela passou do teto sem recusa, o limite era maior e o teto sobe. Uma recusa real
+          marca o ponto exato.</p>
+      </article>
+      <article class="tile reveal" style="--d:.06s" data-spot>
+        <h3>Acertar leva cinco segundos</h3>
+        <p>Digite nos Ajustes o percentual que o app oficial da Anthropic mostra e o teto se ajusta
+          na hora.</p>
+      </article>
+      <article class="tile reveal" style="--d:.12s" data-spot>
+        <h3>Quem manda em quem</h3>
+        <p>Na dúvida, vale a evidência mais forte.</p>
+        <ol class="order"><li>Recusa real da API</li><li>Ajuste manual</li><li>Inferência pelo uso</li></ol>
+      </article>
     </div>
   </div>
 </section>
 
 <section class="section" id="instalar">
   <div class="wrap">
-    <div class="section-head">
+    <div class="section-head reveal">
       <p class="eyebrow">Instalar</p>
-      <h2>Três passos, uma vez só.</h2>
-      <p class="lede">Requer macOS 14 ou superior e um Mac com Apple Silicon (M1 em diante).
-        Só mostra dados de quem usa Claude Code ou Codex na própria máquina.</p>
+      <h2>Três passos,<br>uma vez só.</h2>
+      <p class="lede">Requer macOS 14 ou superior e um Mac com Apple Silicon (M1 em diante). Mostra
+        dados de quem usa Claude Code ou Codex na própria máquina.</p>
     </div>
 
     <div class="steps">
-      <div class="step">
-        <div>
-          <h3>Baixe e descompacte</h3>
-          <p>Arraste o <code>TokenBar.app</code> para a pasta Aplicativos.</p>
-          <a class="btn btn-main" id="baixar2" href="#" download style="margin-top:14px">
-            Baixar para Mac <small id="verlabel2"></small>
-          </a>
-        </div>
+      <div class="step reveal">
+        <h3>Baixe e descompacte</h3>
+        <p>Arraste o <code>TokenBar.app</code> para a pasta <strong>Aplicativos</strong>.</p>
+        <div class="gap"></div>
+        <a class="btn btn-main" data-download href="#" download>Baixar para Mac <small data-ver></small></a>
       </div>
-      <div class="step">
-        <div>
-          <h3>Libere a primeira abertura</h3>
-          <p>O app é assinado localmente, sem conta paga de desenvolvedor da Apple, então o
-            macOS bloqueia na primeira vez. Isso destrava de uma vez por todas:</p>
-          <code class="code">xattr -dr com.apple.quarantine /Applications/TokenBar.app</code>
+      <div class="step reveal" style="--d:.08s">
+        <h3>Libere a primeira abertura</h3>
+        <p>O app não é assinado por conta paga da Apple, então o macOS bloqueia na primeira vez. Isso
+          destrava de uma vez por todas:</p>
+        <div class="gap"></div>
+        <div class="cmd">
+          <code id="xattr">xattr -dr com.apple.quarantine /Applications/TokenBar.app</code>
+          <button class="copy" data-copy="xattr" aria-label="Copiar comando">
+            <svg class="cp" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="2"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>
+            <svg class="ok" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 8.5 3.2 3L13 4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
+        <p class="alt">Sem terminal: botão direito no app › Abrir › Abrir.</p>
       </div>
-      <div class="step">
-        <div>
-          <h3>Calibre o Claude</h3>
-          <p>Abra o painel, vá em <strong>Ajustes › Calibrar o Claude</strong> e informe o
-            percentual que o app da Anthropic mostra em Configurações › Uso. O Codex já vem
-            certo e não precisa de nada.</p>
-        </div>
+      <div class="step reveal" style="--d:.16s">
+        <h3>Acerte o Claude</h3>
+        <p>Opcional. Em <strong>Ajustes › Acertar o Claude</strong>, informe o percentual que o app da
+          Anthropic mostra em Configurações › Uso. O Codex já vem certo.</p>
       </div>
     </div>
   </div>
@@ -515,31 +964,40 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
 
 <section class="section" id="novidades">
   <div class="wrap">
-    <div class="section-head">
+    <div class="section-head reveal">
       <p class="eyebrow">Novidades</p>
-      <h2>O que mudou em cada versão.</h2>
+      <h2>O que mudou<br>em cada versão.</h2>
     </div>
-    <div class="releases" id="releases"></div>
+    <div class="timeline" id="releases"><div class="skeleton"></div></div>
+    <button class="more" id="more" hidden></button>
   </div>
 </section>
-<section class="section" id="autor">
+
+<section class="final">
   <div class="wrap">
-    <div class="author">
+    <img class="appicon reveal" src="icon.svg" alt="" width="112" height="112">
+    <h2 class="reveal" style="--d:.06s">Pare de adivinhar<br>quanto falta.</h2>
+    <p class="lede reveal" style="--d:.12s">Gratuito, nativo e silencioso. Fica na barra até você precisar dele.</p>
+    <div class="cta reveal" style="--d:.18s">
+      <a class="btn btn-main" data-download href="#instalar" download>Baixar para Mac <small data-ver></small></a>
+    </div>
+  </div>
+</section>
+
+<section id="autor">
+  <div class="wrap">
+    <div class="author reveal">
       <div class="author-mark" aria-hidden="true">LP</div>
-      <div class="author-body">
-        <p class="eyebrow" style="margin-bottom:10px">Quem fez</p>
-        <h2 style="font-size:clamp(24px,2.8vw,31px)">Lucas Pardinho</h2>
-        <p class="author-role">Engenheiro de Software Sênior &amp; Tech Lead</p>
-        <p class="author-stack">Java · Spring Boot · Node.js · Next.js · TypeScript · Laravel · Python</p>
-        <p class="author-focus">Arquitetura, microsserviços, IA aplicada e liderança de times</p>
-        <a class="btn btn-ghost" style="margin-top:22px"
-           href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/>
-          </svg>
-          Conectar no LinkedIn
-        </a>
+      <div>
+        <p class="muted" style="font-size:13px;margin-bottom:4px">Quem fez</p>
+        <h3>Lucas Pardinho</h3>
+        <p class="role">Engenheiro de Software Sênior &amp; Tech Lead</p>
+        <p class="stack-l">Java · Spring Boot · Node.js · Next.js · TypeScript · Laravel · Python</p>
       </div>
+      <a class="btn btn-ghost" href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>
+        LinkedIn
+      </a>
     </div>
   </div>
 </section>
@@ -547,9 +1005,7 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
 
 <footer>
   <div class="wrap footrow">
-    <span>TokenBar · gratuito · feito por
-      <a href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener"
-         style="color:var(--dim)">Lucas Pardinho</a></span>
+    <span>TokenBar · gratuito · feito por <a href="https://www.linkedin.com/in/pardinhodev/" target="_blank" rel="noopener">Lucas Pardinho</a></span>
     <span id="rodape"></span>
   </div>
 </footer>
@@ -558,34 +1014,199 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
 (() => {
   'use strict';
 
-  /* ── Anéis do painel ───────────────────────────────────────────
-     Desenhados por script para o traçado animar do zero até o valor. */
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const calmo = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── Cabeçalho: borda só depois de rolar ───────────────────────── */
+  const header = $('header');
+  const sentinela = document.createElement('div');
+  sentinela.style.cssText = 'position:absolute;top:0;height:1px;width:1px';
+  document.body.prepend(sentinela);
+  new IntersectionObserver(([e]) => header.classList.toggle('scrolled', !e.isIntersecting)).observe(sentinela);
+
+  /* ── Revelação ao rolar: uma vez, e só o que entra na tela ─────── */
+  const revelar = new IntersectionObserver((itens) => {
+    for (const e of itens) if (e.isIntersecting) { e.target.classList.add('in'); revelar.unobserve(e.target); }
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
+  $$('.reveal').forEach((el) => revelar.observe(el));
+
+  /* ── Relógio da barra de menus ─────────────────────────────────── */
+  const relogio = () => {
+    const d = new Date();
+    const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dia = d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/,/g, '');
+    $$('[data-clock]').forEach((el) => (el.textContent = hm));
+    $$('[data-clock-day]').forEach((el) => (el.textContent = dia));
+    const mini = $('.mini-bar .muted'); if (mini) mini.textContent = `${dia.split(' ')[0]} ${hm}`;
+  };
+  relogio();
+  setInterval(relogio, 15000);
+
+  /* ── Anéis do painel ───────────────────────────────────────────── */
   const R = 22, C = 2 * Math.PI * R;
-  document.querySelectorAll('[data-dial]').forEach((el, i) => {
+  const aneis = {};
+  $$('[data-dial]').forEach((el) => {
     const pct = Number(el.dataset.pct);
     const cor = el.dataset.color === 'codex' ? 'var(--codex)' : 'var(--claude)';
-    const svg = `
-      <svg viewBox="0 0 52 52" aria-label="${pct}% usado">
-        <circle cx="26" cy="26" r="${R}" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="4"/>
-        <circle cx="26" cy="26" r="${R}" fill="none" stroke="${cor}" stroke-width="4"
-                stroke-linecap="round" transform="rotate(-90 26 26)"
-                stroke-dasharray="${C}" stroke-dashoffset="${C}"
-                style="transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.25,1) ${i * 0.09 + 0.2}s"/>
-        <text class="pct" x="26" y="30.5" text-anchor="middle">${pct}%</text>
-      </svg>`;
-    el.insertAdjacentHTML('afterbegin', svg);
-    requestAnimationFrame(() => {
-      el.querySelector('circle:last-of-type').style.strokeDashoffset = C * (1 - pct / 100);
-    });
+    el.insertAdjacentHTML('afterbegin', `
+      <svg viewBox="0 0 54 54" role="img" aria-label="${pct}% usado">
+        <circle cx="27" cy="27" r="${R}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4.5"/>
+        <circle class="ring" cx="27" cy="27" r="${R}" fill="none" stroke="${cor}" stroke-width="4.5"
+                stroke-linecap="round" transform="rotate(-90 27 27)"
+                stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
+        <text x="27" y="31.5" text-anchor="middle">${pct}%</text>
+      </svg>`);
+    aneis[el.dataset.dial] = { el, pct, ring: $('.ring', el), txt: $('text', el), svg: $('svg', el) };
+  });
+  const pintarAnel = (a, i = 0) => {
+    a.ring.style.transitionDelay = `${i * 0.07}s`;
+    a.ring.style.strokeDashoffset = C * (1 - a.pct / 100);
+  };
+  const zerarAneis = () => Object.values(aneis).forEach((a) => {
+    a.ring.style.transitionDelay = '0s';
+    a.ring.style.strokeDashoffset = C;
   });
 
-  /* ── Versões e download ───────────────────────────────────────
+  /* ── O painel: abre e fecha, interrompível no meio ─────────────── */
+  const painel = $('#panel'), toggle = $('#mbtoggle'), palco = $('#stage');
+  const abrir = (sim) => {
+    painel.classList.toggle('open', sim);
+    toggle.setAttribute('aria-expanded', String(sim));
+    if (sim) Object.values(aneis).forEach(pintarAnel); else zerarAneis();
+  };
+  // Resposta no toque: pointerdown, não click. Um clique logo depois do
+  // hover que abriu o painel não o fecha de volta.
+  let abertoPorHover = 0;
+  toggle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (performance.now() - abertoPorHover < 500) return;
+    abrir(!painel.classList.contains('open'));
+  });
+  toggle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(!painel.classList.contains('open')); } });
+  // Como no app: passar o mouse abre.
+  if (matchMedia('(hover: hover)').matches) toggle.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'mouse' || painel.classList.contains('open')) return;
+    abertoPorHover = performance.now();
+    abrir(true);
+  });
+
+  /* ── Terminal: uma passada, sem loop ───────────────────────────── */
+  const linhas = [
+    ['<span class="c-f">~/widgets/tokenbar</span> <span class="c-g">❯</span> claude', 0],
+    ['<span class="c-g">✻</span> Claude Code <span class="c-f">· opus-5.5</span>', 300],
+    ['', 120],
+    ['<span class="c-b">›</span> refatore o cálculo do teto em Ceiling.swift', 900],
+    ['', 120],
+    ['<span class="c-g">●</span> Lendo <span class="c-f">Sources/Ceiling.swift</span>', 700],
+    ['<span class="c-g">●</span> Lendo <span class="c-f">Sources/Collectors.swift</span>', 500],
+    ['<span class="c-g">●</span> Editando 2 arquivos <span class="c-f">(+38 −21)</span>', 900],
+    ['<span class="c-g">✓</span> Teto passa a aprender só com janelas encerradas.', 1100],
+  ];
+  const term = $('#term');
+  const escreverTerminal = async () => {
+    for (const [html, espera] of linhas) {
+      if (!calmo) await new Promise((r) => setTimeout(r, espera));
+      const d = document.createElement('div');
+      d.innerHTML = html || '&nbsp;';
+      term.append(d);
+    }
+    term.insertAdjacentHTML('beforeend', '<div><span class="c-g">❯</span> <span class="caret"></span></div>');
+  };
+
+  /* ── Números que andam enquanto a sessão roda ──────────────────── */
+  const estado = { today: 31.1, cycle: 142.5, cost: 24.9, cc: 42, ctx: 31 };
+  const setTick = (el, txt) => {
+    if (el.textContent === txt) return;
+    el.textContent = txt;
+    if (calmo) return;
+    el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick');
+  };
+  const nivel = (p) => (p >= 85 ? 'lvl-alert' : p >= 60 ? 'lvl-warn' : '');
+  let ticks = 0, vivo = false, timer = 0;
+  const passo = () => {
+    ticks++;
+    const d = 0.04 + Math.random() * 0.18;
+    estado.today += d; estado.cycle += d;
+    estado.cost += d * 0.78;
+    setTick($('#cc-today'), estado.today.toFixed(1) + 'M');
+    setTick($('#cc-cycle'), estado.cycle.toFixed(1) + 'M');
+    setTick($('#cc-cost'), '$' + estado.cost.toFixed(2));
+    if (ticks % 4 === 0 && estado.cc < 49) {
+      estado.cc++;
+      const b = $('#mb-cc b'); setTick(b, estado.cc + '%');
+      const a = aneis.cc5; a.pct = estado.cc;
+      a.txt.textContent = estado.cc + '%';
+      a.svg.setAttribute('aria-label', `${estado.cc}% usado`);
+      if (painel.classList.contains('open')) { a.ring.style.transitionDelay = '0s'; a.ring.style.strokeDashoffset = C * (1 - a.pct / 100); }
+    }
+    if (ticks % 3 === 0 && estado.ctx < 44) {
+      estado.ctx++;
+      $('#ctx').style.setProperty('--ctx', estado.ctx + '%');
+      $('#ctx-v').textContent = estado.ctx + '%';
+    }
+  };
+  const loop = () => { clearTimeout(timer); if (!vivo || document.hidden) return; passo(); timer = setTimeout(loop, 1800 + Math.random() * 1400); };
+
+  // Só anima com o palco na tela e a aba visível.
+  let palcoVisto = false;
+  new IntersectionObserver(([e]) => {
+    if (e.isIntersecting && !palcoVisto) {
+      palcoVisto = true;
+      palco.classList.add('in');
+      setTimeout(() => abrir(true), calmo ? 0 : 650);
+      escreverTerminal();
+    }
+    vivo = e.isIntersecting && !calmo;
+    if (vivo) timer = setTimeout(loop, 2400); else clearTimeout(timer);
+  }, { threshold: 0.2 }).observe(palco);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && vivo) loop(); });
+
+  /* ── Luz que segue o ponteiro nos cartões ──────────────────────── */
+  if (matchMedia('(hover: hover)').matches) {
+    $$('[data-spot]').forEach((el) => el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      el.style.setProperty('--my', `${e.clientY - r.top}px`);
+    }, { passive: true }));
+  }
+
+  /* ── Anel arrastável: 1:1 com o dedo, sem transição no traço ───── */
+  const RB = 52, CB = 2 * Math.PI * RB;
+  const big = $('#bigring'), bigval = $('#bigval'), minir = $('#minir'), minival = $('#minival');
+  const slider = $('#limit'), banner = $('#banner');
+  big.style.strokeDasharray = CB;
+  const cor = (p) => (p >= 85 ? 'var(--alert)' : p >= 60 ? 'var(--warn)' : 'var(--claude)');
+  const desenhar = (p) => {
+    big.style.strokeDashoffset = CB * (1 - p / 100);
+    big.style.stroke = cor(p);
+    bigval.textContent = p;
+    minival.textContent = p;
+    minir.className = 'r ' + nivel(p);
+    banner.classList.toggle('on', p >= 80);
+  };
+  slider.addEventListener('input', () => desenhar(Number(slider.value)));
+  desenhar(Number(slider.value));
+
+  /* ── Copiar comando ────────────────────────────────────────────── */
+  $$('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
+    const txt = document.getElementById(btn.dataset.copy).textContent;
+    try { await navigator.clipboard.writeText(txt); } catch {
+      const r = document.createRange(); r.selectNodeContents(document.getElementById(btn.dataset.copy));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand('copy'); s.removeAllRanges();
+    }
+    btn.classList.add('done'); btn.setAttribute('aria-label', 'Copiado');
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.classList.remove('done'); btn.setAttribute('aria-label', 'Copiar comando'); }, 1800);
+  }));
+
+  /* ── Versões e download ────────────────────────────────────────
      A lista vem de versions.json, gerado por landing/sync.sh — assim
      publicar uma versão nova não exige editar esta página. */
-  const fmtData = (iso) => {
-    const [a, m, d] = iso.split('-');
-    return `${d}/${m}/${a}`;
-  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtData = (iso) => { const [a, m, d] = iso.split('-'); return `${d}/${m}/${a}`; };
+  const VISIVEIS = 4;
 
   fetch('versions.json', { cache: 'no-cache' })
     .then((r) => r.json())
@@ -593,36 +1214,45 @@ footer { border-top: 1px solid var(--rule); padding: 44px 0 60px; color: var(--f
       const atual = dados.versoes.find((v) => v.versao === dados.atual) || dados.versoes[0];
 
       if (atual && atual.arquivo) {
-        for (const id of ['baixar', 'baixar2']) {
-          const a = document.getElementById(id);
-          if (a) a.href = atual.arquivo;
-        }
+        $$('[data-download]').forEach((a) => (a.href = atual.arquivo));
         const mb = (atual.tamanhoKB / 1024).toFixed(1).replace('.', ',');
-        document.getElementById('verlabel').textContent = `${atual.versao}`;
-        document.getElementById('verlabel2').textContent = `${atual.versao}`;
-        document.getElementById('filenote').textContent =
-          `versão ${atual.versao} · ${mb} MB · Apple Silicon · macOS 14+`;
-        document.getElementById('rodape').textContent = `versão atual ${atual.versao}`;
+        $$('[data-ver]').forEach((el) => (el.textContent = atual.versao));
+        $$('[data-filenote]').forEach((el) => (el.textContent = `versão ${atual.versao} · ${mb} MB · Apple Silicon · macOS 14+`));
+        $$('[data-size]').forEach((el) => (el.textContent = `${mb} MB`));
+        $('#rodape').textContent = `versão atual ${atual.versao}`;
+        if (atual.titulo) {
+          $('#pilltag').textContent = `Novo · ${atual.versao}`;
+          $('#pilltext').textContent = atual.titulo;
+        }
       }
 
-      document.getElementById('releases').innerHTML = dados.versoes.map((v) => `
-        <article class="release">
+      const lista = $('#releases');
+      lista.innerHTML = dados.versoes.map((v, i) => `
+        <article class="release${v.versao === dados.atual ? ' now' : ''}${i >= VISIVEIS ? ' extra' : ''}">
           <div class="meta">
-            <div class="v">${v.versao}</div>
-            <div class="d">${fmtData(v.data)}</div>
-            ${v.versao === dados.atual ? '<span class="now">atual</span>' : ''}
+            <span class="v">${esc(v.versao)}</span>
+            <span>${esc(fmtData(v.data))}</span>
+            ${v.versao === dados.atual ? '<span class="badge">atual</span>' : ''}
           </div>
-          <div>
-            ${v.titulo ? `<h3>${v.titulo}</h3>` : ''}
-            <ul>${(v.notas || []).map((n) => `<li>${n}</li>`).join('')}</ul>
-            ${v.arquivo ? `<p class="dl"><a href="${v.arquivo}" download>Baixar esta versão</a>
-              <span class="sha">sha256 ${v.sha256}</span></p>` : ''}
-          </div>
+          ${v.titulo ? `<h3>${esc(v.titulo)}</h3>` : ''}
+          ${(v.notas || []).length ? `<ul>${v.notas.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+          ${v.arquivo ? `<p class="dl"><a href="${esc(v.arquivo)}" download>Baixar ${esc(v.versao)}</a>
+            <span class="sha">sha256 ${esc(v.sha256)}</span></p>` : ''}
         </article>`).join('');
+
+      const mais = $('#more');
+      if (dados.versoes.length > VISIVEIS) {
+        mais.hidden = false;
+        mais.textContent = `Ver todas as ${dados.versoes.length} versões`;
+        mais.addEventListener('click', () => {
+          const todas = lista.classList.toggle('all');
+          mais.textContent = todas ? 'Mostrar menos' : `Ver todas as ${dados.versoes.length} versões`;
+          if (!todas) lista.scrollIntoView({ block: 'start' });
+        });
+      }
     })
     .catch(() => {
-      document.getElementById('releases').innerHTML =
-        '<article class="release"><div></div><div><p style="color:var(--dim)">Não foi possível carregar a lista de versões.</p></div></article>';
+      $('#releases').innerHTML = '<article class="release"><p style="color:var(--dim)">Não foi possível carregar a lista de versões.</p></article>';
     });
 })();
 </script>
